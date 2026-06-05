@@ -26,14 +26,14 @@ export default function LoginDialog({ onLogin, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 p-6 rounded-lg w-80">
+      <div className="bg-scout-teal p-6 rounded-lg w-80">
         <h2 className="text-xl mb-4">Login</h2>
         {error && <p className="text-red-400 mb-2">{error}</p>}
-        <input className="w-full mb-3 p-2 bg-gray-700 rounded" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
-        <input className="w-full mb-4 p-2 bg-gray-700 rounded" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} />
+        <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
+        <input className="w-full mb-4 p-2 bg-scout-teal-light rounded" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} />
         <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-700">Cancel</button>
-          <button onClick={submit} className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700">Login</button>
+          <button onClick={onClose} className="px-4 py-2 bg-scout-teal-light rounded hover:bg-scout-teal">Cancel</button>
+          <button onClick={submit} className="px-4 py-2 bg-scout-purple rounded hover:bg-scout-purple-light">Login</button>
         </div>
       </div>
     </div>

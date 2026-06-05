@@ -97,7 +97,7 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
-      <div className="bg-gray-800 p-6 rounded-lg w-full max-w-3xl my-8 max-h-[90vh] overflow-y-auto">
+      <div className="bg-scout-teal p-6 rounded-lg w-full max-w-3xl my-8 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Team: {model.teamName}</h2>
           <span className="text-sm text-gray-400">
@@ -115,15 +115,15 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
         <fieldset disabled={disabled} className="mb-6">
           <legend className="text-lg font-semibold mb-2">Team Details</legend>
           <div className="grid grid-cols-2 gap-3">
-            <input className="p-2 bg-gray-700 rounded" placeholder="Team Name" value={model.teamName || ''} onChange={e => update('teamName', e.target.value)} />
-            <select className="p-2 bg-gray-700 rounded" value={model.hikeClass || ''} onChange={e => update('hikeClass', e.target.value)}>
+            <input className="p-2 bg-scout-teal-light rounded" placeholder="Team Name" value={model.teamName || ''} onChange={e => update('teamName', e.target.value)} />
+            <select className="p-2 bg-scout-teal-light rounded" value={model.hikeClass || ''} onChange={e => update('hikeClass', e.target.value)}>
               <option value="">Select Hike Class</option>
               {HIKE_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <input className="p-2 bg-gray-700 rounded" placeholder="Section" value={model.section || ''} onChange={e => update('section', e.target.value)} />
-            <input className="p-2 bg-gray-700 rounded" placeholder="Group Name" value={model.groupName || ''} onChange={e => update('groupName', e.target.value)} />
-            <input className="p-2 bg-gray-700 rounded" placeholder="District" value={model.district || ''} onChange={e => update('district', e.target.value)} />
-            <input className="p-2 bg-gray-700 rounded" placeholder="County" value={model.county || ''} onChange={e => update('county', e.target.value)} />
+            <input className="p-2 bg-scout-teal-light rounded" placeholder="Section" value={model.section || ''} onChange={e => update('section', e.target.value)} />
+            <input className="p-2 bg-scout-teal-light rounded" placeholder="Group Name" value={model.groupName || ''} onChange={e => update('groupName', e.target.value)} />
+            <input className="p-2 bg-scout-teal-light rounded" placeholder="District" value={model.district || ''} onChange={e => update('district', e.target.value)} />
+            <input className="p-2 bg-scout-teal-light rounded" placeholder="County" value={model.county || ''} onChange={e => update('county', e.target.value)} />
           </div>
         </fieldset>
 
@@ -131,8 +131,8 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
         <fieldset disabled={disabled} className="mb-6">
           <legend className="text-lg font-semibold mb-2">Team Phones</legend>
           <div className="grid grid-cols-2 gap-3">
-            <input className="p-2 bg-gray-700 rounded" placeholder="Active Phone" value={model.activeMobile || ''} onChange={e => update('activeMobile', e.target.value)} />
-            <input className="p-2 bg-gray-700 rounded" placeholder="Backup Phone" value={model.backupMobile || ''} onChange={e => update('backupMobile', e.target.value)} />
+            <input className="p-2 bg-scout-teal-light rounded" placeholder="Active Phone" value={model.activeMobile || ''} onChange={e => update('activeMobile', e.target.value)} />
+            <input className="p-2 bg-scout-teal-light rounded" placeholder="Backup Phone" value={model.backupMobile || ''} onChange={e => update('backupMobile', e.target.value)} />
           </div>
         </fieldset>
 
@@ -189,10 +189,10 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
         <fieldset disabled={disabled} className="mb-6">
           <legend className="text-lg font-semibold mb-2">Emergency Contact</legend>
           <div className="grid grid-cols-2 gap-3">
-            <input className="p-2 bg-gray-700 rounded" placeholder="Name" value={model.emergencyContactName || ''} onChange={e => update('emergencyContactName', e.target.value)} />
-            <input className="p-2 bg-gray-700 rounded" placeholder="Email" value={model.emergencyContactEmail || ''} onChange={e => update('emergencyContactEmail', e.target.value)} />
-            <input className="p-2 bg-gray-700 rounded" placeholder="Mobile" value={model.emergencyContactMobile || ''} onChange={e => update('emergencyContactMobile', e.target.value)} />
-            <input className="p-2 bg-gray-700 rounded" placeholder="Landline" value={model.emergencyContactLandline || ''} onChange={e => update('emergencyContactLandline', e.target.value)} />
+            <input className="p-2 bg-scout-teal-light rounded" placeholder="Name" value={model.emergencyContactName || ''} onChange={e => update('emergencyContactName', e.target.value)} />
+            <input className="p-2 bg-scout-teal-light rounded" placeholder="Email" value={model.emergencyContactEmail || ''} onChange={e => update('emergencyContactEmail', e.target.value)} />
+            <input className="p-2 bg-scout-teal-light rounded" placeholder="Mobile" value={model.emergencyContactMobile || ''} onChange={e => update('emergencyContactMobile', e.target.value)} />
+            <input className="p-2 bg-scout-teal-light rounded" placeholder="Landline" value={model.emergencyContactLandline || ''} onChange={e => update('emergencyContactLandline', e.target.value)} />
           </div>
         </fieldset>
 
@@ -205,10 +205,10 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
                 ? <button onClick={submitTeam} className="bg-green-600 px-4 py-2 rounded hover:bg-green-700">Submit Team</button>
                 : <button onClick={withdrawTeam} className="bg-orange-600 px-4 py-2 rounded hover:bg-orange-700">Withdraw</button>
               }
-              <button onClick={() => save(true)} className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700">Save</button>
+              <button onClick={() => save(true)} className="bg-scout-purple px-4 py-2 rounded hover:bg-scout-purple-light">Save</button>
             </>
           )}
-          <button onClick={onClose} className="bg-gray-600 px-4 py-2 rounded hover:bg-gray-700">Cancel</button>
+          <button onClick={onClose} className="bg-scout-teal-light px-4 py-2 rounded hover:bg-scout-teal">Cancel</button>
         </div>
 
         {showScoutDialog && <ScoutDialog scout={editingScout} onSave={saveScout} onClose={() => setShowScoutDialog(false)} />}

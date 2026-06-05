@@ -23,15 +23,15 @@ export default function AdminPanel({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
-      <div className="bg-gray-800 p-6 rounded-lg w-full max-w-4xl my-8 max-h-[90vh] overflow-y-auto">
+      <div className="bg-scout-teal p-6 rounded-lg w-full max-w-4xl my-8 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Admin Panel</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">&times;</button>
         </div>
 
         <div className="flex gap-4 mb-4">
-          <button onClick={() => setTab('users')} className={`px-4 py-2 rounded ${tab === 'users' ? 'bg-blue-600' : 'bg-gray-700'}`}>Users</button>
-          <button onClick={() => setTab('teams')} className={`px-4 py-2 rounded ${tab === 'teams' ? 'bg-blue-600' : 'bg-gray-700'}`}>Teams</button>
+          <button onClick={() => setTab('users')} className={`px-4 py-2 rounded ${tab === 'users' ? 'bg-scout-purple' : 'bg-scout-teal-light'}`}>Users</button>
+          <button onClick={() => setTab('teams')} className={`px-4 py-2 rounded ${tab === 'teams' ? 'bg-scout-purple' : 'bg-scout-teal-light'}`}>Teams</button>
         </div>
 
         {tab === 'users' && (

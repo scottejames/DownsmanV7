@@ -70,8 +70,8 @@ export default function Home() {
           <p className="text-yellow-400 mb-4">This is DEVELOPMENT</p>
         )}
         <div className="flex gap-4">
-          <button onClick={() => setShowLogin(true)} className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700">Login</button>
-          <button onClick={() => setShowRegister(true)} className="bg-gray-600 px-4 py-2 rounded hover:bg-gray-700">Register</button>
+          <button onClick={() => setShowLogin(true)} className="bg-scout-purple px-4 py-2 rounded hover:bg-scout-purple-light">Login</button>
+          <button onClick={() => setShowRegister(true)} className="bg-scout-teal-light px-4 py-2 rounded hover:bg-scout-teal">Register</button>
         </div>
         {showLogin && <LoginDialog onLogin={handleLogin} onClose={() => setShowLogin(false)} />}
         {showRegister && <RegisterDialog onClose={() => setShowRegister(false)} />}
@@ -89,8 +89,8 @@ export default function Home() {
           {process.env.NEXT_PUBLIC_DM_DEV === 'true' && <span className="text-yellow-400">DEV</span>}
           {effectiveLocked && <span className="text-red-400">LOCKED</span>}
           <span>Logged in: {user.username}</span>
-          {user.admin && <button onClick={() => setShowAdmin(true)} className="bg-purple-600 px-3 py-1 rounded hover:bg-purple-700">Admin</button>}
-          <button onClick={() => setUser(null)} className="bg-gray-600 px-3 py-1 rounded hover:bg-gray-700">Logout</button>
+          {user.admin && <button onClick={() => setShowAdmin(true)} className="bg-scout-purple px-3 py-1 rounded hover:bg-scout-purple-light">Admin</button>}
+          <button onClick={() => setUser(null)} className="bg-scout-teal-light px-3 py-1 rounded hover:bg-scout-teal">Logout</button>
         </div>
       </div>
 
@@ -113,7 +113,7 @@ export default function Home() {
             <tr
               key={t.id}
               onClick={() => setSelectedTeam(t)}
-              className={`border-b border-gray-700 cursor-pointer hover:bg-gray-800 ${selectedTeam?.id === t.id ? 'bg-gray-700' : ''}`}
+              className={`border-b border-gray-700 cursor-pointer hover:bg-scout-purple/20 ${selectedTeam?.id === t.id ? 'bg-scout-purple/30' : ''}`}
             >
               <td className="p-2">{t.teamName}</td>
               <td className="p-2">{t.hikeClass || '-'}</td>
@@ -127,7 +127,7 @@ export default function Home() {
 
       <div className="flex gap-4">
         <button onClick={deleteTeamHandler} disabled={!selectedTeam || effectiveLocked} className="bg-red-600 px-4 py-2 rounded disabled:opacity-50 hover:bg-red-700">Delete Team</button>
-        <button onClick={editTeam} disabled={!selectedTeam} className="bg-blue-600 px-4 py-2 rounded disabled:opacity-50 hover:bg-blue-700">{effectiveLocked ? 'View Team' : 'Edit Team'}</button>
+        <button onClick={editTeam} disabled={!selectedTeam} className="bg-scout-purple px-4 py-2 rounded disabled:opacity-50 hover:bg-scout-purple-light">{effectiveLocked ? 'View Team' : 'Edit Team'}</button>
         {!effectiveLocked && <button onClick={addTeam} className="bg-green-600 px-4 py-2 rounded hover:bg-green-700">Add Team</button>}
       </div>
 
