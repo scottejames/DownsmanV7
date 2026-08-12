@@ -7,7 +7,7 @@
 - **Database**: DynamoDB (eu-west-2)
 - **Region**: eu-west-2
 - **Amplify App ID**: d1mwozzx371w2q
-- **URL**: https://d1mwozzx371w2q.amplifyapp.com
+- **URL**: https://master.d1mwozzx371w2q.amplifyapp.com
 
 ## How Deployment Works
 
@@ -44,6 +44,8 @@ Or manually:
 git push origin master
 # Then check: https://eu-west-2.console.aws.amazon.com/amplify/apps/d1mwozzx371w2q
 ```
+
+Live site: https://master.d1mwozzx371w2q.amplifyapp.com
 
 ## Environment Variables (set in Amplify Console)
 
