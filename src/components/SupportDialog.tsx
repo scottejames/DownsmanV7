@@ -2,10 +2,15 @@
 
 import { useState } from 'react';
 import { SupportModel } from '@/models/types';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import Banner from './ui/Banner';
+import { inputClass } from './ui/form';
+import { ApiError } from './ui/api';
 
 interface Props {
   support: SupportModel | null;
-  onSave: (s: SupportModel) => void;
+  onSave: (s: SupportModel) => Promise<void>;
   onClose: () => void;
 }
 
@@ -14,31 +19,40 @@ export default function SupportDialog({ support, onSave, onClose }: Props) {
   const [phoneNumber, setPhoneNumber] = useState(support?.phoneNumber || '');
   const [from, setFrom] = useState(support?.from || '');
   const [to, setTo] = useState(support?.to || '');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const save = () => {
-    onSave({
-      ...(support || { ownerID: '' }),
-      id: support?.id,
-      fullName,
-      phoneNumber,
-      from,
-      to,
-    } as SupportModel);
+  const save = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await onSave({
+        ...(support || { ownerID: '' }),
+        id: support?.id,
+        fullName,
+        phoneNumber,
+        from,
+        to,
+      } as SupportModel);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not save support contact');
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-      <div className="bg-scout-teal p-6 rounded-lg w-96">
-        <h2 className="text-xl mb-4">{support ? 'Edit' : 'Add'} Support Member</h2>
-        <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" placeholder="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} />
-        <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" placeholder="Phone Number" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
-        <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" placeholder="From (checkpoint)" value={from} onChange={e => setFrom(e.target.value)} />
-        <input className="w-full mb-4 p-2 bg-scout-teal-light rounded" placeholder="To (checkpoint)" value={to} onChange={e => setTo(e.target.value)} />
-        <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 bg-scout-teal-light rounded hover:bg-scout-teal">Cancel</button>
-          <button onClick={save} className="px-4 py-2 bg-scout-purple rounded hover:bg-scout-purple-light">Save</button>
-        </div>
+    <Modal title={support ? 'Edit Support Member' : 'Add Support Member'} onClose={onClose} zIndexClass="z-[60]">
+      {error && <Banner tone="error">{error}</Banner>}
+      <div className="space-y-3">
+        <input className={inputClass} placeholder="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} />
+        <input className={inputClass} placeholder="Phone Number" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
+        <input className={inputClass} placeholder="From (checkpoint)" value={from} onChange={e => setFrom(e.target.value)} />
+        <input className={inputClass} placeholder="To (checkpoint)" value={to} onChange={e => setTo(e.target.value)} />
       </div>
-    </div>
+      <div className="mt-5 flex justify-end gap-3">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={save} loading={loading}>Save</Button>
+      </div>
+    </Modal>
   );
 }

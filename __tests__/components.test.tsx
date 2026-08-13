@@ -125,4 +125,17 @@ describe('RegisterDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Register' }));
     expect(await screen.findByText('Success!')).toBeInTheDocument();
   });
+
+  it('shows a fallback error instead of crashing on a bare 500 (no JSON body)', async () => {
+    // Regression test: a real prod incident where a 500 with an empty body
+    // (e.g. an unhandled server exception) crashed res.json() uncaught,
+    // leaving the form silently stuck with no feedback at all.
+    (fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 500, json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')) });
+    render(<RegisterDialog onClose={mockClose} />);
+    fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'newuser' } });
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'pass1' } });
+    fireEvent.change(screen.getByPlaceholderText('Confirm Password'), { target: { value: 'pass1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Register' }));
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
+  });
 });

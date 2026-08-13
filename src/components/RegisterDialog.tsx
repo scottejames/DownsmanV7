@@ -1,6 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import Banner from './ui/Banner';
+import { inputClass } from './ui/form';
+import { postJson, ApiError } from './ui/api';
 
 interface Props { onClose: () => void; }
 
@@ -11,46 +16,48 @@ export default function RegisterDialog({ onClose }: Props) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const submit = async () => {
     if (password !== confirm) { setError('Passwords do not match'); return; }
-    const res = await fetch('/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'register', username, password, email, mobile }),
-    });
-    if (!res.ok) { const d = await res.json(); setError(d.error); return; }
-    setSuccess(true);
+    setError('');
+    setLoading(true);
+    try {
+      await postJson('/api/auth', { action: 'register', username, password, email, mobile });
+      setSuccess(true);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (success) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-scout-teal p-6 rounded-lg w-80">
-          <h2 className="text-xl mb-4">Success!</h2>
-          <p className="mb-4">User {username} registered. You can now login.</p>
-          <button onClick={onClose} className="px-4 py-2 bg-scout-purple rounded hover:bg-scout-purple-light">OK</button>
+      <Modal title="Success!" onClose={onClose}>
+        <p className="mb-5 text-sm text-gray-300">User {username} registered. You can now login.</p>
+        <div className="flex justify-end">
+          <Button onClick={onClose}>OK</Button>
         </div>
-      </div>
+      </Modal>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-scout-teal p-6 rounded-lg w-80">
-        <h2 className="text-xl mb-4">Register</h2>
-        {error && <p className="text-red-400 mb-2">{error}</p>}
-        <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
-        <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
-        <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" placeholder="Phone" value={mobile} onChange={e => setMobile(e.target.value)} />
-        <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
-        <input className="w-full mb-4 p-2 bg-scout-teal-light rounded" type="password" placeholder="Confirm Password" value={confirm} onChange={e => setConfirm(e.target.value)} />
-        <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 bg-scout-teal-light rounded hover:bg-scout-teal">Cancel</button>
-          <button onClick={submit} className="px-4 py-2 bg-scout-purple rounded hover:bg-scout-purple-light">Register</button>
-        </div>
+    <Modal title="Register" onClose={onClose}>
+      {error && <Banner tone="error">{error}</Banner>}
+      <div className="space-y-3">
+        <input className={inputClass} placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
+        <input className={inputClass} placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
+        <input className={inputClass} placeholder="Phone" value={mobile} onChange={e => setMobile(e.target.value)} />
+        <input className={inputClass} type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
+        <input className={inputClass} type="password" placeholder="Confirm Password" value={confirm} onChange={e => setConfirm(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} />
       </div>
-    </div>
+      <div className="mt-5 flex justify-end gap-3">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} loading={loading}>Register</Button>
+      </div>
+    </Modal>
   );
 }

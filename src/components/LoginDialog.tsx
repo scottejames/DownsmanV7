@@ -2,6 +2,11 @@
 
 import { useState } from 'react';
 import { UserModel } from '@/models/types';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import Banner from './ui/Banner';
+import { inputClass } from './ui/form';
+import { postJson, ApiError } from './ui/api';
 
 interface Props {
   onLogin: (user: Omit<UserModel, 'password'>) => void;
@@ -12,67 +17,74 @@ export default function LoginDialog({ onLogin, onClose }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [challengeSession, setChallengeSession] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
   const submit = async () => {
     setError('');
-    const res = await fetch('/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'login', username, password }),
-    });
-    if (!res.ok) { setError('Invalid username or password'); return; }
-    const data = await res.json();
-    if (data.challenge === 'NEW_PASSWORD_REQUIRED') {
-      setChallengeSession(data.session);
-      return;
+    setLoading(true);
+    try {
+      const data = await postJson<{ challenge?: string; session?: string } & Omit<UserModel, 'password'>>('/api/auth', {
+        action: 'login', username, password,
+      });
+      if (data.challenge === 'NEW_PASSWORD_REQUIRED') {
+        setChallengeSession(data.session!);
+      } else {
+        onLogin(data);
+      }
+    } catch {
+      setError('Invalid username or password');
+    } finally {
+      setLoading(false);
     }
-    onLogin(data);
   };
 
   const submitNewPassword = async () => {
     if (newPassword !== confirmNewPassword) { setError('Passwords do not match'); return; }
-    const res = await fetch('/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'completeNewPassword', username, newPassword, session: challengeSession }),
-    });
-    if (!res.ok) { setError('Could not set new password'); return; }
-    onLogin(await res.json());
+    setError('');
+    setLoading(true);
+    try {
+      const user = await postJson<Omit<UserModel, 'password'>>('/api/auth', {
+        action: 'completeNewPassword', username, newPassword, session: challengeSession,
+      });
+      onLogin(user);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not set new password');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (challengeSession) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-scout-teal p-6 rounded-lg w-80">
-          <h2 className="text-xl mb-4">Set a new password</h2>
-          <p className="mb-3 text-sm text-gray-300">Your password was reset. Choose a new one to continue.</p>
-          {error && <p className="text-red-400 mb-2">{error}</p>}
-          <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" type="password" placeholder="New password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-          <input className="w-full mb-4 p-2 bg-scout-teal-light rounded" type="password" placeholder="Confirm new password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} />
-          <div className="flex gap-3 justify-end">
-            <button onClick={onClose} className="px-4 py-2 bg-scout-teal-light rounded hover:bg-scout-teal">Cancel</button>
-            <button onClick={submitNewPassword} className="px-4 py-2 bg-scout-purple rounded hover:bg-scout-purple-light">Set password</button>
-          </div>
+      <Modal title="Set a new password" onClose={onClose}>
+        <p className="mb-4 text-sm text-gray-400">Your password was reset. Choose a new one to continue.</p>
+        {error && <Banner tone="error">{error}</Banner>}
+        <div className="space-y-3">
+          <input className={inputClass} type="password" placeholder="New password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+          <input className={inputClass} type="password" placeholder="Confirm new password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitNewPassword()} />
         </div>
-      </div>
+        <div className="mt-5 flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button onClick={submitNewPassword} loading={loading}>Set password</Button>
+        </div>
+      </Modal>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-scout-teal p-6 rounded-lg w-80">
-        <h2 className="text-xl mb-4">Login</h2>
-        {error && <p className="text-red-400 mb-2">{error}</p>}
-        <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
-        <input className="w-full mb-4 p-2 bg-scout-teal-light rounded" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} />
-        <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 bg-scout-teal-light rounded hover:bg-scout-teal">Cancel</button>
-          <button onClick={submit} className="px-4 py-2 bg-scout-purple rounded hover:bg-scout-purple-light">Login</button>
-        </div>
+    <Modal title="Login" onClose={onClose}>
+      {error && <Banner tone="error">{error}</Banner>}
+      <div className="space-y-3">
+        <input className={inputClass} placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
+        <input className={inputClass} type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} />
       </div>
-    </div>
+      <div className="mt-5 flex justify-end gap-3">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={submit} loading={loading}>Login</Button>
+      </div>
+    </Modal>
   );
 }

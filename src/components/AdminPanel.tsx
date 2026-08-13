@@ -1,88 +1,148 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { TeamModel, UserModel } from '@/models/types';
+import Modal from './ui/Modal';
+import Banner from './ui/Banner';
+import { apiRequest, postJson, ApiError } from './ui/api';
 
 interface Props { onClose: () => void; }
+
+const actionLinkClass = 'transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-scout-purple-light disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:no-underline';
 
 export default function AdminPanel({ onClose }: Props) {
   const [tab, setTab] = useState<'users' | 'teams'>('users');
   const [users, setUsers] = useState<Omit<UserModel, 'password'>[]>([]);
   const [teams, setTeams] = useState<TeamModel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [tempPassword, setTempPassword] = useState<{ username: string; password: string } | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
 
-  const loadUsers = () => fetch('/api/admin').then(r => r.json()).then(setUsers);
-  const loadTeams = () => fetch('/api/teams?all=true').then(r => r.json()).then(setTeams);
-
-  useEffect(() => { loadUsers(); loadTeams(); }, []);
-
-  const adminAction = async (action: string, data: Record<string, unknown>) => {
-    const res = await fetch('/api/admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...data }) });
-    if (!res.ok) {
-      alert(res.status === 403 ? 'You no longer have admin access.' : 'Action failed.');
-      return;
+  const load = useCallback(async () => {
+    setError('');
+    try {
+      const [u, t] = await Promise.all([
+        apiRequest<Omit<UserModel, 'password'>[]>('/api/admin'),
+        apiRequest<TeamModel[]>('/api/teams?all=true'),
+      ]);
+      setUsers(u);
+      setTeams(t);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not load admin data');
+    } finally {
+      setLoading(false);
     }
-    const result = await res.json();
-    if (action === 'resetPassword' && result.tempPassword) {
-      alert(`Temporary password for ${data.username}: ${result.tempPassword}\n\nShare this with them directly - they'll be asked to set a new password on next login.`);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const adminAction = async (key: string, action: string, data: Record<string, unknown>) => {
+    setPending(key);
+    setError('');
+    try {
+      const result = await postJson<{ tempPassword?: string }>('/api/admin', { action, ...data });
+      if (action === 'resetPassword' && result.tempPassword && typeof data.username === 'string') {
+        setTempPassword({ username: data.username, password: result.tempPassword });
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Action failed');
+    } finally {
+      setPending(null);
     }
-    loadUsers();
-    loadTeams();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
-      <div className="bg-scout-teal p-6 rounded-lg w-full max-w-4xl my-8 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Admin Panel</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">&times;</button>
-        </div>
-
-        <div className="flex gap-4 mb-4">
-          <button onClick={() => setTab('users')} className={`px-4 py-2 rounded ${tab === 'users' ? 'bg-scout-purple' : 'bg-scout-teal-light'}`}>Users</button>
-          <button onClick={() => setTab('teams')} className={`px-4 py-2 rounded ${tab === 'teams' ? 'bg-scout-purple' : 'bg-scout-teal-light'}`}>Teams</button>
-        </div>
-
-        {tab === 'users' && (
-          <table className="w-full">
-            <thead><tr className="border-b border-gray-600"><th className="text-left p-2">Username</th><th className="text-left p-2">Admin</th><th className="p-2">Actions</th></tr></thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.username} className="border-b border-gray-700">
-                  <td className="p-2">{u.username}</td>
-                  <td className="p-2">{u.admin ? 'Yes' : 'No'}</td>
-                  <td className="p-2 text-right space-x-2">
-                    <button onClick={() => adminAction('toggleAdmin', { username: u.username })} className="text-blue-400 hover:underline">Toggle Admin</button>
-                    <button onClick={() => adminAction('resetPassword', { username: u.username })} className="text-yellow-400 hover:underline">Reset Password</button>
-                    <button onClick={() => adminAction('deleteUser', { username: u.username })} className="text-red-400 hover:underline">Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        {tab === 'teams' && (
-          <table className="w-full">
-            <thead><tr className="border-b border-gray-600"><th className="text-left p-2">Leader</th><th className="text-left p-2">Team</th><th className="text-left p-2">Class</th><th className="text-left p-2">Paid</th><th className="text-left p-2">Submitted</th><th className="p-2">Actions</th></tr></thead>
-            <tbody>
-              {teams.map(t => (
-                <tr key={t.id} className="border-b border-gray-700">
-                  <td className="p-2">{t.leaderName}</td>
-                  <td className="p-2">{t.teamName}</td>
-                  <td className="p-2">{t.hikeClass || '-'}</td>
-                  <td className="p-2">{t.paymentRecieved ? 'Yes' : `£${t.paymentAmount}`}</td>
-                  <td className="p-2">{t.teamSubmitted ? 'Yes' : 'No'}</td>
-                  <td className="p-2 text-right space-x-2">
-                    <button onClick={() => adminAction('togglePaid', { team: t })} className="text-blue-400 hover:underline">Toggle Paid</button>
-                    <button onClick={() => adminAction('toggleSubmitted', { team: t })} className="text-yellow-400 hover:underline">Toggle Submitted</button>
-                    <button onClick={() => adminAction('deleteTeam', { team: t })} className="text-red-400 hover:underline">Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+    <Modal title="Admin Panel" onClose={onClose} maxWidthClass="max-w-4xl">
+      <div className="mb-4 flex gap-2">
+        <button onClick={() => setTab('users')} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'users' ? 'bg-scout-purple text-white' : 'bg-scout-field text-gray-300 hover:bg-scout-field-border'}`}>Users</button>
+        <button onClick={() => setTab('teams')} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'teams' ? 'bg-scout-purple text-white' : 'bg-scout-field text-gray-300 hover:bg-scout-field-border'}`}>Teams</button>
       </div>
-    </div>
+
+      {error && <Banner tone="error">{error}</Banner>}
+      {tempPassword && (
+        <Banner tone="success">
+          <p>Temporary password for <strong>{tempPassword.username}</strong>: <span className="font-mono">{tempPassword.password}</span></p>
+          <p className="text-emerald-400/80">Share this with them directly - they&apos;ll be asked to set a new password on next login.</p>
+        </Banner>
+      )}
+
+      {loading ? (
+        <p className="py-8 text-center text-sm text-gray-400">Loading...</p>
+      ) : (
+        <div className="overflow-x-auto">
+          {tab === 'users' && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-scout-field-border text-left text-xs uppercase tracking-wide text-gray-400">
+                  <th className="p-2 font-medium">Username</th>
+                  <th className="p-2 font-medium">Admin</th>
+                  <th className="p-2 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.length === 0 && (
+                  <tr><td colSpan={3} className="p-4 text-center text-gray-500">No users yet.</td></tr>
+                )}
+                {users.map(u => {
+                  const key = u.username;
+                  const busy = pending === key;
+                  return (
+                    <tr key={u.username} className="border-b border-scout-field-border/60">
+                      <td className="p-2">{u.username}</td>
+                      <td className="p-2">{u.admin ? 'Yes' : 'No'}</td>
+                      <td className="p-2 text-right space-x-3">
+                        <button disabled={busy} onClick={() => adminAction(key, 'toggleAdmin', { username: u.username })} className={`${actionLinkClass} text-sky-400`}>Toggle Admin</button>
+                        <button disabled={busy} onClick={() => adminAction(key, 'resetPassword', { username: u.username })} className={`${actionLinkClass} text-amber-400`}>Reset Password</button>
+                        <button disabled={busy} onClick={() => adminAction(key, 'deleteUser', { username: u.username })} className={`${actionLinkClass} text-red-400`}>Delete</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+
+          {tab === 'teams' && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-scout-field-border text-left text-xs uppercase tracking-wide text-gray-400">
+                  <th className="p-2 font-medium">Leader</th>
+                  <th className="p-2 font-medium">Team</th>
+                  <th className="p-2 font-medium">Class</th>
+                  <th className="p-2 font-medium">Paid</th>
+                  <th className="p-2 font-medium">Submitted</th>
+                  <th className="p-2 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teams.length === 0 && (
+                  <tr><td colSpan={6} className="p-4 text-center text-gray-500">No teams yet.</td></tr>
+                )}
+                {teams.map(t => {
+                  const key = t.id!;
+                  const busy = pending === key;
+                  return (
+                    <tr key={t.id} className="border-b border-scout-field-border/60">
+                      <td className="p-2">{t.leaderName}</td>
+                      <td className="p-2">{t.teamName}</td>
+                      <td className="p-2">{t.hikeClass || '-'}</td>
+                      <td className="p-2">{t.paymentRecieved ? 'Yes' : `£${t.paymentAmount}`}</td>
+                      <td className="p-2">{t.teamSubmitted ? 'Yes' : 'No'}</td>
+                      <td className="p-2 text-right space-x-3">
+                        <button disabled={busy} onClick={() => adminAction(key, 'togglePaid', { team: t })} className={`${actionLinkClass} text-sky-400`}>Toggle Paid</button>
+                        <button disabled={busy} onClick={() => adminAction(key, 'toggleSubmitted', { team: t })} className={`${actionLinkClass} text-amber-400`}>Toggle Submitted</button>
+                        <button disabled={busy} onClick={() => adminAction(key, 'deleteTeam', { team: t })} className={`${actionLinkClass} text-red-400`}>Delete</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </Modal>
   );
 }

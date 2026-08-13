@@ -3,9 +3,14 @@
 import { useState, useEffect } from 'react';
 import { TeamModel, ScoutModel, SupportModel } from '@/models/types';
 import { HIKE_CLASSES } from '@/models/referenceData';
-import { validateTeam, getEntranceFee } from '@/utils/validation';
+import { validateTeam, getPaymentStatus } from '@/utils/validation';
 import ScoutDialog from './ScoutDialog';
 import SupportDialogComponent from './SupportDialog';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import Banner from './ui/Banner';
+import { inputClass, selectClass, fieldsetLegendClass } from './ui/form';
+import { apiRequest, postJson, deleteJson, ApiError } from './ui/api';
 
 interface Props {
   team: TeamModel;
@@ -17,7 +22,13 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
   const [model, setModel] = useState<TeamModel>({ ...team });
   const [scouts, setScouts] = useState<ScoutModel[]>([]);
   const [support, setSupport] = useState<SupportModel[]>([]);
+  const [loadingChildren, setLoadingChildren] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
+  const [apiError, setApiError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [rowPending, setRowPending] = useState<string | null>(null);
   const [showScoutDialog, setShowScoutDialog] = useState(false);
   const [editingScout, setEditingScout] = useState<ScoutModel | null>(null);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
@@ -26,10 +37,15 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
   const disabled = model.teamSubmitted || locked;
 
   useEffect(() => {
-    if (team.id) {
-      fetch(`/api/scouts?ownerID=${team.id}`).then(r => r.json()).then(setScouts);
-      fetch(`/api/support?ownerID=${team.id}`).then(r => r.json()).then(setSupport);
-    }
+    if (!team.id) { setLoadingChildren(false); return; }
+    setLoadingChildren(true);
+    Promise.all([
+      apiRequest<ScoutModel[]>(`/api/scouts?ownerID=${team.id}`),
+      apiRequest<SupportModel[]>(`/api/support?ownerID=${team.id}`),
+    ])
+      .then(([s, sup]) => { setScouts(s); setSupport(sup); })
+      .catch(e => setApiError(e instanceof ApiError ? e.message : 'Could not load team details'))
+      .finally(() => setLoadingChildren(false));
   }, [team.id]);
 
   const update = (field: keyof TeamModel, value: string | boolean) => {
@@ -37,8 +53,16 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
   };
 
   const save = async (close = true) => {
-    await fetch('/api/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(model) });
-    if (close) onClose();
+    setApiError('');
+    setSaving(true);
+    try {
+      await postJson('/api/teams', model);
+      if (close) onClose();
+    } catch (e) {
+      setApiError(e instanceof ApiError ? e.message : 'Could not save team');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const validate = () => {
@@ -48,23 +72,37 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
   };
 
   const submitTeam = async () => {
-    if (validate()) {
+    if (!validate()) return;
+    setApiError('');
+    setSubmitting(true);
+    try {
+      await postJson('/api/teams', { ...model, teamSubmitted: true });
       setModel(m => ({ ...m, teamSubmitted: true }));
-      await fetch('/api/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...model, teamSubmitted: true }) });
       onClose();
+    } catch (e) {
+      setApiError(e instanceof ApiError ? e.message : 'Could not submit team');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const withdrawTeam = async () => {
-    setModel(m => ({ ...m, teamSubmitted: false }));
-    await fetch('/api/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...model, teamSubmitted: false }) });
-    onClose();
+    setApiError('');
+    setWithdrawing(true);
+    try {
+      await postJson('/api/teams', { ...model, teamSubmitted: false });
+      setModel(m => ({ ...m, teamSubmitted: false }));
+      onClose();
+    } catch (e) {
+      setApiError(e instanceof ApiError ? e.message : 'Could not withdraw team');
+    } finally {
+      setWithdrawing(false);
+    }
   };
 
   const saveScout = async (scout: ScoutModel) => {
     scout.ownerID = team.id!;
-    const res = await fetch('/api/scouts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(scout) });
-    const saved = await res.json();
+    const saved = await postJson<ScoutModel>('/api/scouts', scout);
     setScouts(prev => {
       const idx = prev.findIndex(s => s.id === saved.id);
       return idx >= 0 ? prev.map(s => s.id === saved.id ? saved : s) : [...prev, saved];
@@ -74,14 +112,21 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
   };
 
   const deleteScout = async (scout: ScoutModel) => {
-    await fetch('/api/scouts', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ownerID: scout.ownerID, id: scout.id }) });
-    setScouts(prev => prev.filter(s => s.id !== scout.id));
+    setApiError('');
+    setRowPending(scout.id!);
+    try {
+      await deleteJson('/api/scouts', { ownerID: scout.ownerID, id: scout.id });
+      setScouts(prev => prev.filter(s => s.id !== scout.id));
+    } catch (e) {
+      setApiError(e instanceof ApiError ? e.message : 'Could not delete scout');
+    } finally {
+      setRowPending(null);
+    }
   };
 
   const saveSupportMember = async (s: SupportModel) => {
     s.ownerID = team.id!;
-    const res = await fetch('/api/support', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) });
-    const saved = await res.json();
+    const saved = await postJson<SupportModel>('/api/support', s);
     setSupport(prev => {
       const idx = prev.findIndex(x => x.id === saved.id);
       return idx >= 0 ? prev.map(x => x.id === saved.id ? saved : x) : [...prev, saved];
@@ -91,129 +136,159 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
   };
 
   const deleteSupportMember = async (s: SupportModel) => {
-    await fetch('/api/support', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ownerID: s.ownerID, id: s.id }) });
-    setSupport(prev => prev.filter(x => x.id !== s.id));
+    setApiError('');
+    setRowPending(s.id!);
+    try {
+      await deleteJson('/api/support', { ownerID: s.ownerID, id: s.id });
+      setSupport(prev => prev.filter(x => x.id !== s.id));
+    } catch (e) {
+      setApiError(e instanceof ApiError ? e.message : 'Could not delete support contact');
+    } finally {
+      setRowPending(null);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
-      <div className="bg-scout-teal p-6 rounded-lg w-full max-w-3xl my-8 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Team: {model.teamName}</h2>
-          <span className="text-sm text-gray-400">
-            Payment: {model.paymentRecieved ? 'Paid' : `£${model.paymentAmount}`} | Submitted: {model.teamSubmitted ? 'Yes' : 'No'}
-          </span>
-        </div>
+    <Modal
+      title={`Team: ${model.teamName}`}
+      subtitle={`Payment: ${getPaymentStatus(model, scouts)}  ·  Submitted: ${model.teamSubmitted ? 'Yes' : 'No'}`}
+      onClose={onClose}
+      maxWidthClass="max-w-3xl"
+    >
+      {apiError && <Banner tone="error">{apiError}</Banner>}
+      {errors.length > 0 && (
+        <Banner tone="error">
+          {errors.map((e, i) => <p key={i}>{e}</p>)}
+        </Banner>
+      )}
 
-        {errors.length > 0 && (
-          <div className="bg-red-900/50 border border-red-600 p-3 rounded mb-4">
-            {errors.map((e, i) => <p key={i} className="text-red-300 text-sm">{e}</p>)}
+      {loadingChildren ? (
+        <p className="py-8 text-center text-sm text-gray-400">Loading team details...</p>
+      ) : (
+        <>
+          <fieldset disabled={disabled} className="mb-6">
+            <legend className={fieldsetLegendClass}>Team Details</legend>
+            <div className="grid grid-cols-2 gap-3">
+              <input className={inputClass} placeholder="Team Name" value={model.teamName || ''} onChange={e => update('teamName', e.target.value)} />
+              <select className={selectClass} value={model.hikeClass || ''} onChange={e => update('hikeClass', e.target.value)}>
+                <option value="">Select Hike Class</option>
+                {HIKE_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <input className={inputClass} placeholder="Section" value={model.section || ''} onChange={e => update('section', e.target.value)} />
+              <input className={inputClass} placeholder="Group Name" value={model.groupName || ''} onChange={e => update('groupName', e.target.value)} />
+              <input className={inputClass} placeholder="District" value={model.district || ''} onChange={e => update('district', e.target.value)} />
+              <input className={inputClass} placeholder="County" value={model.county || ''} onChange={e => update('county', e.target.value)} />
+            </div>
+          </fieldset>
+
+          <fieldset disabled={disabled} className="mb-6">
+            <legend className={fieldsetLegendClass}>Team Phones</legend>
+            <div className="grid grid-cols-2 gap-3">
+              <input className={inputClass} placeholder="Active Phone" value={model.activeMobile || ''} onChange={e => update('activeMobile', e.target.value)} />
+              <input className={inputClass} placeholder="Backup Phone" value={model.backupMobile || ''} onChange={e => update('backupMobile', e.target.value)} />
+            </div>
+          </fieldset>
+
+          <div className="mb-6">
+            <h3 className={fieldsetLegendClass}>Hiking Team</h3>
+            <div className="overflow-x-auto">
+              <table className="mb-2 w-full text-sm">
+                <thead>
+                  <tr className="border-b border-scout-field-border text-left text-xs uppercase tracking-wide text-gray-400">
+                    <th className="p-1.5 font-medium">Name</th>
+                    <th className="p-1.5 font-medium">DOB</th>
+                    <th className="p-1.5 font-medium">Leader</th>
+                    <th className="p-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scouts.length === 0 && (
+                    <tr><td colSpan={4} className="p-3 text-center text-gray-500">No scouts added yet.</td></tr>
+                  )}
+                  {scouts.map(s => (
+                    <tr key={s.id} className="border-b border-scout-field-border/60">
+                      <td className="p-1.5">{s.fullName}</td>
+                      <td className="p-1.5">{s.dobEpoch ? new Date(s.dobEpoch * 86400000).toLocaleDateString('en-GB') : 'N/A'}</td>
+                      <td className="p-1.5">{s.leader ? 'Yes' : 'No'}</td>
+                      <td className="p-1.5 text-right space-x-2">
+                        {!disabled && <>
+                          <button disabled={rowPending === s.id} onClick={() => { setEditingScout(s); setShowScoutDialog(true); }} className="text-sky-400 transition hover:underline disabled:opacity-40">Edit</button>
+                          <button disabled={rowPending === s.id} onClick={() => deleteScout(s)} className="text-red-400 transition hover:underline disabled:opacity-40">Delete</button>
+                        </>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!disabled && <Button variant="success" onClick={() => { setEditingScout(null); setShowScoutDialog(true); }}>Add Scout</Button>}
           </div>
-        )}
 
-        {/* Team Details */}
-        <fieldset disabled={disabled} className="mb-6">
-          <legend className="text-lg font-semibold mb-2">Team Details</legend>
-          <div className="grid grid-cols-2 gap-3">
-            <input className="p-2 bg-scout-teal-light rounded" placeholder="Team Name" value={model.teamName || ''} onChange={e => update('teamName', e.target.value)} />
-            <select className="p-2 bg-scout-teal-light rounded" value={model.hikeClass || ''} onChange={e => update('hikeClass', e.target.value)}>
-              <option value="">Select Hike Class</option>
-              {HIKE_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <input className="p-2 bg-scout-teal-light rounded" placeholder="Section" value={model.section || ''} onChange={e => update('section', e.target.value)} />
-            <input className="p-2 bg-scout-teal-light rounded" placeholder="Group Name" value={model.groupName || ''} onChange={e => update('groupName', e.target.value)} />
-            <input className="p-2 bg-scout-teal-light rounded" placeholder="District" value={model.district || ''} onChange={e => update('district', e.target.value)} />
-            <input className="p-2 bg-scout-teal-light rounded" placeholder="County" value={model.county || ''} onChange={e => update('county', e.target.value)} />
+          <div className="mb-6">
+            <h3 className={fieldsetLegendClass}>Support Team</h3>
+            <div className="overflow-x-auto">
+              <table className="mb-2 w-full text-sm">
+                <thead>
+                  <tr className="border-b border-scout-field-border text-left text-xs uppercase tracking-wide text-gray-400">
+                    <th className="p-1.5 font-medium">Name</th>
+                    <th className="p-1.5 font-medium">Phone</th>
+                    <th className="p-1.5 font-medium">From</th>
+                    <th className="p-1.5 font-medium">To</th>
+                    <th className="p-1.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {support.length === 0 && (
+                    <tr><td colSpan={5} className="p-3 text-center text-gray-500">No support crew added yet.</td></tr>
+                  )}
+                  {support.map(s => (
+                    <tr key={s.id} className="border-b border-scout-field-border/60">
+                      <td className="p-1.5">{s.fullName}</td>
+                      <td className="p-1.5">{s.phoneNumber}</td>
+                      <td className="p-1.5">{s.from}</td>
+                      <td className="p-1.5">{s.to}</td>
+                      <td className="p-1.5 text-right space-x-2">
+                        {!disabled && <>
+                          <button disabled={rowPending === s.id} onClick={() => { setEditingSupport(s); setShowSupportDialog(true); }} className="text-sky-400 transition hover:underline disabled:opacity-40">Edit</button>
+                          <button disabled={rowPending === s.id} onClick={() => deleteSupportMember(s)} className="text-red-400 transition hover:underline disabled:opacity-40">Delete</button>
+                        </>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {!disabled && <Button variant="success" onClick={() => { setEditingSupport(null); setShowSupportDialog(true); }}>Add Support</Button>}
           </div>
-        </fieldset>
 
-        {/* Phones */}
-        <fieldset disabled={disabled} className="mb-6">
-          <legend className="text-lg font-semibold mb-2">Team Phones</legend>
-          <div className="grid grid-cols-2 gap-3">
-            <input className="p-2 bg-scout-teal-light rounded" placeholder="Active Phone" value={model.activeMobile || ''} onChange={e => update('activeMobile', e.target.value)} />
-            <input className="p-2 bg-scout-teal-light rounded" placeholder="Backup Phone" value={model.backupMobile || ''} onChange={e => update('backupMobile', e.target.value)} />
+          <fieldset disabled={disabled} className="mb-6">
+            <legend className={fieldsetLegendClass}>Emergency Contact</legend>
+            <div className="grid grid-cols-2 gap-3">
+              <input className={inputClass} placeholder="Name" value={model.emergencyContactName || ''} onChange={e => update('emergencyContactName', e.target.value)} />
+              <input className={inputClass} placeholder="Email" value={model.emergencyContactEmail || ''} onChange={e => update('emergencyContactEmail', e.target.value)} />
+              <input className={inputClass} placeholder="Mobile" value={model.emergencyContactMobile || ''} onChange={e => update('emergencyContactMobile', e.target.value)} />
+              <input className={inputClass} placeholder="Landline" value={model.emergencyContactLandline || ''} onChange={e => update('emergencyContactLandline', e.target.value)} />
+            </div>
+          </fieldset>
+
+          <div className="flex flex-wrap justify-end gap-3">
+            {!disabled && (
+              <>
+                <Button variant="warning" onClick={validate}>Validate</Button>
+                {!model.teamSubmitted
+                  ? <Button variant="success" onClick={submitTeam} loading={submitting}>Submit Team</Button>
+                  : <Button variant="caution" onClick={withdrawTeam} loading={withdrawing}>Withdraw</Button>
+                }
+                <Button onClick={() => save(true)} loading={saving}>Save</Button>
+              </>
+            )}
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
           </div>
-        </fieldset>
+        </>
+      )}
 
-        {/* Scouts */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-2">Hiking Team</h3>
-          <table className="w-full mb-2">
-            <thead><tr className="border-b border-gray-600"><th className="text-left p-1">Name</th><th className="text-left p-1">DOB</th><th className="text-left p-1">Leader</th><th className="p-1"></th></tr></thead>
-            <tbody>
-              {scouts.map(s => (
-                <tr key={s.id} className="border-b border-gray-700">
-                  <td className="p-1">{s.fullName}</td>
-                  <td className="p-1">{s.dobEpoch ? new Date(s.dobEpoch * 86400000).toLocaleDateString('en-GB') : 'N/A'}</td>
-                  <td className="p-1">{s.leader ? 'Yes' : 'No'}</td>
-                  <td className="p-1 text-right">
-                    {!disabled && <>
-                      <button onClick={() => { setEditingScout(s); setShowScoutDialog(true); }} className="text-blue-400 mr-2 hover:underline">Edit</button>
-                      <button onClick={() => deleteScout(s)} className="text-red-400 hover:underline">Delete</button>
-                    </>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!disabled && <button onClick={() => { setEditingScout(null); setShowScoutDialog(true); }} className="bg-green-600 px-3 py-1 rounded hover:bg-green-700">Add Scout</button>}
-        </div>
-
-        {/* Support */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-2">Support Team</h3>
-          <table className="w-full mb-2">
-            <thead><tr className="border-b border-gray-600"><th className="text-left p-1">Name</th><th className="text-left p-1">Phone</th><th className="text-left p-1">From</th><th className="text-left p-1">To</th><th className="p-1"></th></tr></thead>
-            <tbody>
-              {support.map(s => (
-                <tr key={s.id} className="border-b border-gray-700">
-                  <td className="p-1">{s.fullName}</td>
-                  <td className="p-1">{s.phoneNumber}</td>
-                  <td className="p-1">{s.from}</td>
-                  <td className="p-1">{s.to}</td>
-                  <td className="p-1 text-right">
-                    {!disabled && <>
-                      <button onClick={() => { setEditingSupport(s); setShowSupportDialog(true); }} className="text-blue-400 mr-2 hover:underline">Edit</button>
-                      <button onClick={() => deleteSupportMember(s)} className="text-red-400 hover:underline">Delete</button>
-                    </>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!disabled && <button onClick={() => { setEditingSupport(null); setShowSupportDialog(true); }} className="bg-green-600 px-3 py-1 rounded hover:bg-green-700">Add Support</button>}
-        </div>
-
-        {/* Emergency Contact */}
-        <fieldset disabled={disabled} className="mb-6">
-          <legend className="text-lg font-semibold mb-2">Emergency Contact</legend>
-          <div className="grid grid-cols-2 gap-3">
-            <input className="p-2 bg-scout-teal-light rounded" placeholder="Name" value={model.emergencyContactName || ''} onChange={e => update('emergencyContactName', e.target.value)} />
-            <input className="p-2 bg-scout-teal-light rounded" placeholder="Email" value={model.emergencyContactEmail || ''} onChange={e => update('emergencyContactEmail', e.target.value)} />
-            <input className="p-2 bg-scout-teal-light rounded" placeholder="Mobile" value={model.emergencyContactMobile || ''} onChange={e => update('emergencyContactMobile', e.target.value)} />
-            <input className="p-2 bg-scout-teal-light rounded" placeholder="Landline" value={model.emergencyContactLandline || ''} onChange={e => update('emergencyContactLandline', e.target.value)} />
-          </div>
-        </fieldset>
-
-        {/* Buttons */}
-        <div className="flex gap-3 justify-end">
-          {!disabled && (
-            <>
-              <button onClick={validate} className="bg-yellow-600 px-4 py-2 rounded hover:bg-yellow-700">Validate</button>
-              {!model.teamSubmitted
-                ? <button onClick={submitTeam} className="bg-green-600 px-4 py-2 rounded hover:bg-green-700">Submit Team</button>
-                : <button onClick={withdrawTeam} className="bg-orange-600 px-4 py-2 rounded hover:bg-orange-700">Withdraw</button>
-              }
-              <button onClick={() => save(true)} className="bg-scout-purple px-4 py-2 rounded hover:bg-scout-purple-light">Save</button>
-            </>
-          )}
-          <button onClick={onClose} className="bg-scout-teal-light px-4 py-2 rounded hover:bg-scout-teal">Cancel</button>
-        </div>
-
-        {showScoutDialog && <ScoutDialog scout={editingScout} onSave={saveScout} onClose={() => setShowScoutDialog(false)} />}
-        {showSupportDialog && <SupportDialogComponent support={editingSupport} onSave={saveSupportMember} onClose={() => setShowSupportDialog(false)} />}
-      </div>
-    </div>
+      {showScoutDialog && <ScoutDialog scout={editingScout} onSave={saveScout} onClose={() => setShowScoutDialog(false)} />}
+      {showSupportDialog && <SupportDialogComponent support={editingSupport} onSave={saveSupportMember} onClose={() => setShowSupportDialog(false)} />}
+    </Modal>
   );
 }

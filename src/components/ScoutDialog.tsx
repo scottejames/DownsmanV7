@@ -2,10 +2,15 @@
 
 import { useState } from 'react';
 import { ScoutModel } from '@/models/types';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import Banner from './ui/Banner';
+import { inputClass, textareaClass, checkboxLabelClass } from './ui/form';
+import { ApiError } from './ui/api';
 
 interface Props {
   scout: ScoutModel | null;
-  onSave: (scout: ScoutModel) => void;
+  onSave: (scout: ScoutModel) => Promise<void>;
   onClose: () => void;
 }
 
@@ -14,35 +19,44 @@ export default function ScoutDialog({ scout, onSave, onClose }: Props) {
   const [dob, setDob] = useState(scout?.dobEpoch ? new Date(scout.dobEpoch * 86400000).toISOString().split('T')[0] : '');
   const [leader, setLeader] = useState(scout?.leader || false);
   const [medicalNotes, setMedicalNotes] = useState(scout?.medicalNotes || '');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const save = () => {
+  const save = async () => {
     const dobEpoch = dob ? Math.floor(new Date(dob + 'T00:00:00Z').getTime() / 86400000) : 0;
-    onSave({
-      ...(scout || { ownerID: '' }),
-      id: scout?.id,
-      fullName,
-      dobEpoch: leader ? 0 : dobEpoch,
-      leader,
-      medicalNotes,
-    } as ScoutModel);
+    setError('');
+    setLoading(true);
+    try {
+      await onSave({
+        ...(scout || { ownerID: '' }),
+        id: scout?.id,
+        fullName,
+        dobEpoch: leader ? 0 : dobEpoch,
+        leader,
+        medicalNotes,
+      } as ScoutModel);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not save scout');
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
-      <div className="bg-scout-teal p-6 rounded-lg w-96">
-        <h2 className="text-xl mb-4">{scout ? 'Edit' : 'Add'} Scout</h2>
-        <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" placeholder="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} />
-        <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" type="date" disabled={leader} value={dob} onChange={e => setDob(e.target.value)} />
-        <label className="flex items-center gap-2 mb-3">
+    <Modal title={scout ? 'Edit Scout' : 'Add Scout'} onClose={onClose} zIndexClass="z-[60]">
+      {error && <Banner tone="error">{error}</Banner>}
+      <div className="space-y-3">
+        <input className={inputClass} placeholder="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} />
+        <input className={inputClass} type="date" disabled={leader} value={dob} onChange={e => setDob(e.target.value)} />
+        <label className={checkboxLabelClass}>
           <input type="checkbox" checked={leader} onChange={e => setLeader(e.target.checked)} />
           Scout Leader (walking with open team)
         </label>
-        <textarea className="w-full mb-4 p-2 bg-scout-teal-light rounded h-24" placeholder="Medical Notes" value={medicalNotes} onChange={e => setMedicalNotes(e.target.value)} />
-        <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 bg-scout-teal-light rounded hover:bg-scout-teal">Cancel</button>
-          <button onClick={save} className="px-4 py-2 bg-scout-purple rounded hover:bg-scout-purple-light">Save</button>
-        </div>
+        <textarea className={`${textareaClass} h-24`} placeholder="Medical Notes" value={medicalNotes} onChange={e => setMedicalNotes(e.target.value)} />
       </div>
-    </div>
+      <div className="mt-5 flex justify-end gap-3">
+        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+        <Button onClick={save} loading={loading}>Save</Button>
+      </div>
+    </Modal>
   );
 }
