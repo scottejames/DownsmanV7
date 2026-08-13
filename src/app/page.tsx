@@ -7,8 +7,13 @@ import RegisterDialog from '@/components/RegisterDialog';
 import TeamDialog from '@/components/TeamDialog';
 import AdminPanel from '@/components/AdminPanel';
 
+// Refresh well before the id token's ~60 minute expiry so an open tab never
+// hits a hard logout mid-session.
+const SILENT_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
+
 export default function Home() {
   const [user, setUser] = useState<Omit<UserModel, 'password'> | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [teams, setTeams] = useState<TeamModel[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<TeamModel | null>(null);
   const [showLogin, setShowLogin] = useState(false);
@@ -27,9 +32,34 @@ export default function Home() {
 
   useEffect(() => { loadTeams(); }, [loadTeams]);
 
+  // Restore the session on load - without this, refreshing the page always
+  // logs you out, since the only thing carrying login state used to be React
+  // state with nothing behind it.
+  useEffect(() => {
+    fetch('/api/auth/session')
+      .then(res => (res.ok ? res.json() : null))
+      .then(u => { if (u) setUser(u); })
+      .finally(() => setCheckingSession(false));
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const timer = setInterval(async () => {
+      const res = await fetch('/api/auth/refresh', { method: 'POST' });
+      if (!res.ok) { setUser(null); return; }
+      setUser(await res.json());
+    }, SILENT_REFRESH_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [user]);
+
   const handleLogin = (u: Omit<UserModel, 'password'>) => {
     setUser(u);
     setShowLogin(false);
+  };
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setUser(null);
   };
 
   const addTeam = async () => {
@@ -62,6 +92,10 @@ export default function Home() {
     if (selectedTeam) setShowTeamDialog(true);
   };
 
+  if (checkingSession) {
+    return <main className="max-w-4xl mx-auto p-6" />;
+  }
+
   if (!user) {
     return (
       <main className="max-w-4xl mx-auto p-6">
@@ -90,7 +124,7 @@ export default function Home() {
           {effectiveLocked && <span className="text-red-400">LOCKED</span>}
           <span>Logged in: {user.username}</span>
           {user.admin && <button onClick={() => setShowAdmin(true)} className="bg-scout-purple px-3 py-1 rounded hover:bg-scout-purple-light">Admin</button>}
-          <button onClick={() => setUser(null)} className="bg-scout-teal-light px-3 py-1 rounded hover:bg-scout-teal">Logout</button>
+          <button onClick={handleLogout} className="bg-scout-teal-light px-3 py-1 rounded hover:bg-scout-teal">Logout</button>
         </div>
       </div>
 

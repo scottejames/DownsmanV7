@@ -12,17 +12,54 @@ export default function LoginDialog({ onLogin, onClose }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [challengeSession, setChallengeSession] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
 
   const submit = async () => {
+    setError('');
     const res = await fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'login', username, password }),
     });
     if (!res.ok) { setError('Invalid username or password'); return; }
-    const user = await res.json();
-    onLogin(user);
+    const data = await res.json();
+    if (data.challenge === 'NEW_PASSWORD_REQUIRED') {
+      setChallengeSession(data.session);
+      return;
+    }
+    onLogin(data);
   };
+
+  const submitNewPassword = async () => {
+    if (newPassword !== confirmNewPassword) { setError('Passwords do not match'); return; }
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'completeNewPassword', username, newPassword, session: challengeSession }),
+    });
+    if (!res.ok) { setError('Could not set new password'); return; }
+    onLogin(await res.json());
+  };
+
+  if (challengeSession) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-scout-teal p-6 rounded-lg w-80">
+          <h2 className="text-xl mb-4">Set a new password</h2>
+          <p className="mb-3 text-sm text-gray-300">Your password was reset. Choose a new one to continue.</p>
+          {error && <p className="text-red-400 mb-2">{error}</p>}
+          <input className="w-full mb-3 p-2 bg-scout-teal-light rounded" type="password" placeholder="New password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+          <input className="w-full mb-4 p-2 bg-scout-teal-light rounded" type="password" placeholder="Confirm new password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} />
+          <div className="flex gap-3 justify-end">
+            <button onClick={onClose} className="px-4 py-2 bg-scout-teal-light rounded hover:bg-scout-teal">Cancel</button>
+            <button onClick={submitNewPassword} className="px-4 py-2 bg-scout-purple rounded hover:bg-scout-purple-light">Set password</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

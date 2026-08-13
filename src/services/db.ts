@@ -77,6 +77,15 @@ export async function getAllTeams(): Promise<TeamModel[]> {
   return (res.Items || []) as TeamModel[];
 }
 
+export async function getTeamById(id: string): Promise<TeamModel | null> {
+  const res = await db.send(new ScanCommand({
+    TableName: 'Team',
+    FilterExpression: 'id = :id',
+    ExpressionAttributeValues: { ':id': id },
+  }));
+  return (res.Items?.[0] as TeamModel) || null;
+}
+
 export async function saveTeam(team: TeamModel): Promise<TeamModel> {
   if (!team.id) team.id = uuid();
   await db.send(new PutCommand({ TableName: 'Team', Item: team }));

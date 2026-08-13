@@ -50,6 +50,48 @@ describe('LoginDialog', () => {
     await screen.findByPlaceholderText('Username');
     expect(mockLogin).toHaveBeenCalledWith(user);
   });
+
+  it('prompts for a new password on a NEW_PASSWORD_REQUIRED challenge, then logs in', async () => {
+    const user = { id: '1', username: 'test', admin: false, breakLock: false };
+    (fetch as jest.Mock)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ challenge: 'NEW_PASSWORD_REQUIRED', session: 'sess-1', username: 'test' }) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(user) });
+
+    render(<LoginDialog onLogin={mockLogin} onClose={mockClose} />);
+    fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'test' } });
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'temp-pass' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+
+    expect(await screen.findByRole('heading', { name: 'Set a new password' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('New password'), { target: { value: 'newpass1' } });
+    fireEvent.change(screen.getByPlaceholderText('Confirm new password'), { target: { value: 'newpass1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
+
+    await screen.findByPlaceholderText('New password');
+    expect(mockLogin).toHaveBeenCalledWith(user);
+    const secondCallBody = JSON.parse((fetch as jest.Mock).mock.calls[1][1].body);
+    expect(secondCallBody).toMatchObject({ action: 'completeNewPassword', username: 'test', newPassword: 'newpass1', session: 'sess-1' });
+  });
+
+  it('shows an error when the new passwords do not match', async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ challenge: 'NEW_PASSWORD_REQUIRED', session: 'sess-1', username: 'test' }),
+    });
+    render(<LoginDialog onLogin={mockLogin} onClose={mockClose} />);
+    fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'test' } });
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'temp-pass' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+
+    await screen.findByRole('heading', { name: 'Set a new password' });
+    fireEvent.change(screen.getByPlaceholderText('New password'), { target: { value: 'one' } });
+    fireEvent.change(screen.getByPlaceholderText('Confirm new password'), { target: { value: 'two' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set password' }));
+
+    expect(await screen.findByText('Passwords do not match')).toBeInTheDocument();
+    expect(mockLogin).not.toHaveBeenCalled();
+  });
 });
 
 describe('RegisterDialog', () => {

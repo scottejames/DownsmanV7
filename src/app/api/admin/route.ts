@@ -1,37 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllUsers, updateUser, deleteUser, getAllTeams, saveTeam, deleteTeam } from '@/services/db';
-import { hashPassword } from '@/utils/hash';
+import { saveTeam, deleteTeam } from '@/services/db';
+import * as cognito from '@/services/cognito';
+import { getSession } from '@/lib/authz';
 
-export async function GET() {
-  const users = await getAllUsers();
-  const safe = users.map(({ password, ...rest }) => rest);
-  return NextResponse.json(safe);
+export async function GET(req: NextRequest) {
+  const session = getSession(req);
+  if (!session.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const users = await cognito.listUsers();
+  return NextResponse.json(users);
 }
 
 export async function POST(req: NextRequest) {
+  const session = getSession(req);
+  if (!session.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const { action, ...data } = await req.json();
 
   if (action === 'toggleAdmin') {
-    const users = await getAllUsers();
-    const user = users.find(u => u.username === data.username);
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    user.admin = !user.admin;
-    await updateUser(user);
+    const isAdmin = await cognito.isInGroup(data.username, 'admin');
+    await cognito.setGroupMembership(data.username, 'admin', !isAdmin);
     return NextResponse.json({ ok: true });
   }
 
   if (action === 'deleteUser') {
-    await deleteUser(data.username);
+    await cognito.adminDeleteUser(data.username);
     return NextResponse.json({ ok: true });
   }
 
   if (action === 'resetPassword') {
-    const users = await getAllUsers();
-    const user = users.find(u => u.username === data.username);
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    user.password = hashPassword('password1');
-    await updateUser(user);
-    return NextResponse.json({ ok: true });
+    // A random, non-permanent password forces a real NEW_PASSWORD_REQUIRED
+    // challenge on next login, replacing the old fixed 'password1'. The admin
+    // needs to relay this to the user out of band (phone/email), so it comes
+    // back in the response for AdminPanel to display once.
+    const tempPassword = generateTempPassword();
+    await cognito.adminSetPassword(data.username, tempPassword, false);
+    return NextResponse.json({ ok: true, tempPassword });
   }
 
   if (action === 'togglePaid') {
@@ -54,4 +58,10 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+}
+
+function generateTempPassword(): string {
+  // Must satisfy the pool's password policy (6+ chars incl. a number) - see
+  // scripts/create-cognito-pool.js.
+  return 'Temp-' + Math.floor(100000 + Math.random() * 900000);
 }

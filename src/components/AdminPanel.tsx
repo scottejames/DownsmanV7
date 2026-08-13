@@ -16,7 +16,15 @@ export default function AdminPanel({ onClose }: Props) {
   useEffect(() => { loadUsers(); loadTeams(); }, []);
 
   const adminAction = async (action: string, data: Record<string, unknown>) => {
-    await fetch('/api/admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...data }) });
+    const res = await fetch('/api/admin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...data }) });
+    if (!res.ok) {
+      alert(res.status === 403 ? 'You no longer have admin access.' : 'Action failed.');
+      return;
+    }
+    const result = await res.json();
+    if (action === 'resetPassword' && result.tempPassword) {
+      alert(`Temporary password for ${data.username}: ${result.tempPassword}\n\nShare this with them directly - they'll be asked to set a new password on next login.`);
+    }
     loadUsers();
     loadTeams();
   };
