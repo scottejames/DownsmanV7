@@ -135,3 +135,37 @@ of truth.
 env var, a feature flag, anything set outside the codebase itself), prefer building a
 way to inspect the *live* value over trusting the docs to stay accurate — this repo has
 already been bitten twice by the alternative.
+
+## A "selected item" held alongside a list must be refreshed from the same reload, or reconciled directly from a mutation's response
+
+`page.tsx` reported this exact incident: `TeamDialog`'s `save()`/`submitTeam()`/
+`withdrawTeam()` all funnel through the same `onClose` callback, which only called
+`loadTeams()` to refresh the `teams` array shown in the table - it never touched the
+separately-held `selectedTeam`. Since `TeamDialog` initializes its local `model` from
+whatever `team` prop it's given, and a save is a full-item overwrite (not a merge),
+reopening "Edit Team" without first re-clicking the row handed it a stale copy - and
+saving again, even unchanged, silently wrote that stale copy back over the field that
+had just been saved. Fixed by having `loadTeams()` re-derive `selectedTeam` from the
+freshly-fetched list by id, rather than leaving it frozen at whatever it was last
+explicitly set to.
+
+Contrast this with `TeamDialog`'s own `scouts`/`support` state, which never had this
+bug: `saveScout()`/`saveSupport()` reconcile `scouts`/`support` directly from the
+server's response to that same mutation (`setScouts(prev => ...)`), never relying on a
+separate reload plus a stale intermediate object. That's the preferred shape when it's
+available - reconcile from the mutation's own response, not a follow-up fetch of
+something else.
+
+**Why this only showed up at one boundary:** `AdminPanel` doesn't hold a persisted
+"selected" item across a dialog reopen at all - every row action reads straight from
+its own render-time list - so it was never exposed to this failure mode. The bug needs
+both ingredients: a full-item overwrite on save, and a "selected" copy that outlives
+the save without being told about it.
+
+**How to apply:** any time a component holds `list` and a separately-selected
+`selectedX` derived from an earlier snapshot of that list, a mutation that refreshes
+`list` must also refresh `selectedX` (by re-deriving it from the fresh list, or by
+updating it directly from the mutation's own response) - otherwise the next reopen of
+a detail view can silently write stale data back over a real change. Grep for
+`useState` pairs of this shape (`items` + `selectedItem`) when auditing a new screen
+for this class of bug.

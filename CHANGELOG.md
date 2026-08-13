@@ -3,6 +3,11 @@
 All notable changes to this project are documented here, newest first.
 This project doesn't cut versioned releases, so entries are grouped by date rather than version number.
 
+## 2026-08-13 (6)
+
+### Fixed
+- **Editing a team and saving could silently revert the previous save.** `page.tsx`'s `selectedTeam` was never refreshed after a successful save/submit/withdraw in `TeamDialog` - only the `teams` list was reloaded. Reopening "Edit Team" without first re-clicking the team's row in the table handed `TeamDialog` a stale copy of the team, and since a save does a full-item overwrite (not a merge), saving again - even with no further changes - wrote that stale copy straight back over the real data, wiping out whatever was changed in the prior save (reported: assign a hike class, save, "Edit Team" again shows the class as unset, saving again blanks it in the database). `loadTeams()` now re-derives `selectedTeam` from the freshly-fetched list by id. Regression test in `__tests__/teamEditFlow.test.tsx` reproduces the exact repro steps.
+
 ## 2026-08-13 (5)
 
 ### Added

@@ -28,8 +28,14 @@ export default function Home() {
   const loadTeams = useCallback(async () => {
     if (!user?.id) return;
     const res = await fetch(`/api/teams?ownerID=${user.id}`);
-    const data = await res.json();
+    const data: TeamModel[] = await res.json();
     setTeams(data);
+    // Keep selectedTeam in sync with what was just saved. Without this, TeamDialog's
+    // onClose (fired after save/submitTeam/withdrawTeam) only refreshed the `teams`
+    // list, leaving selectedTeam frozen at whatever it was before the edit - so
+    // reopening "Edit Team" without first re-clicking the row handed TeamDialog a
+    // stale copy, and saving again silently reverted the change that was just made.
+    setSelectedTeam(prev => (prev ? data.find(t => t.id === prev.id) ?? null : prev));
   }, [user?.id]);
 
   useEffect(() => { loadTeams(); }, [loadTeams]);
