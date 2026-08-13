@@ -4,9 +4,18 @@
 
 - Node.js 18+
 - Docker
-- AWS CLI (for verifying tables)
+- AWS CLI, with credentials that can create/manage a Cognito user pool
 
-## 1. Start Local DynamoDB
+## 1. Provision a dev Cognito pool (one-time)
+
+```bash
+npm install
+node scripts/create-cognito-pool.js dev
+```
+
+This prints a `COGNITO_USER_POOL_ID` and `COGNITO_CLIENT_ID` - keep them for step 3.
+
+## 2. Start Local DynamoDB
 
 ```bash
 docker run -v ~/tmp/data:/data -p 8000:8000 amazon/dynamodb-local -jar DynamoDBLocal.jar -sharedDb -dbPath /data
@@ -14,20 +23,14 @@ docker run -v ~/tmp/data:/data -p 8000:8000 amazon/dynamodb-local -jar DynamoDBL
 
 This persists data to `~/tmp/data` so it survives restarts.
 
-## 2. Install Dependencies
-
-```bash
-cd NewDownsman
-npm install
-```
-
 ## 3. Create Environment Config
 
 ```bash
 cp .env.example .env.local
 ```
 
-Default settings connect to local DynamoDB on port 8000.
+Fill in the `COGNITO_USER_POOL_ID`/`COGNITO_CLIENT_ID` from step 1. Default
+settings otherwise connect to local DynamoDB on port 8000.
 
 ## 4. Create Database Tables
 
@@ -41,15 +44,15 @@ Verify they exist:
 aws dynamodb list-tables --endpoint-url http://localhost:8000 --region eu-west-2
 ```
 
-You should see: User, Team, Scouts, Support, Log.
+You should see: Team, Scouts, Support, Log.
 
 ## 5. Start the App
 
 ```bash
-npm run dev
+./scripts/start-local.sh
 ```
 
-Open http://localhost:3000
+Or run steps 2-4 manually then `npm run dev`. Open http://localhost:3000.
 
 ## 6. Create Your First User
 
@@ -57,28 +60,25 @@ Open http://localhost:3000
 2. Fill in username, email, phone, password
 3. Login with your new credentials
 
+This creates a real user in the dev Cognito pool from step 1 - there's no
+local/offline auth emulation.
+
 ## 7. Make a User Admin
 
-Use dynamodb-admin:
+Admin status is a Cognito group, not a database field:
 
 ```bash
-npm install -g dynamodb-admin
-export DYNAMO_ENDPOINT=http://localhost:8000
-export AWS_REGION=eu-west-2
-dynamodb-admin
+aws cognito-idp admin-add-user-to-group \
+  --user-pool-id <your dev pool id> \
+  --username <username> \
+  --group-name admin \
+  --region eu-west-2
 ```
 
-Open http://localhost:8001/tables/User, find your user, change `admin` from `false` to `true`.
+They'll need to log out and back in (or wait for the next token refresh) to
+pick up the new group membership.
 
 ## Production
 
-Set these environment variables and point at real DynamoDB:
-
-```bash
-export DM_DEV=false
-export NEXT_PUBLIC_DM_DEV=false
-export NEXT_PUBLIC_DM_LOCK=false   # set to true to lock entries
-
-npm run build
-npm start
-```
+See [DEPLOYMENT.md](./DEPLOYMENT.md) - production runs on AWS Amplify Hosting
+against the prod Cognito pool and real DynamoDB, not this local setup.

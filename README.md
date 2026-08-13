@@ -1,61 +1,50 @@
-# Downsman - Next.js/TypeScript Edition
+# Downsman
 
-A scout hiking event team registration system, rewritten from Vaadin/Java to Next.js + TypeScript + Tailwind CSS with DynamoDB backend.
+A scout hiking event team registration system, rewritten from Vaadin/Java to
+Next.js + TypeScript + Tailwind CSS, with DynamoDB for data and Amazon
+Cognito for authentication.
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for how this is hosted and deployed, and
+[TODO.md](./TODO.md) for known follow-up work.
 
 ## Prerequisites
 
 - Node.js 18+
-- DynamoDB (local via Docker, or AWS)
-- AWS credentials configured (`~/.aws/credentials`)
+- Docker (for local DynamoDB)
+- AWS credentials configured (`~/.aws/credentials`), with access to a dev
+  Cognito user pool - see `scripts/create-cognito-pool.js`
 
 ## Quick Start
 
 ```bash
-# Install dependencies
-npm install
-
-# Copy environment config
-cp .env.example .env.local
-
-# Start local DynamoDB
-docker run -v ~/tmp/data:/data -p 8000:8000 amazon/dynamodb-local -jar DynamoDBLocal.jar -sharedDb -dbPath /data
-
-# Create tables (same schema as original - User, Team, Scouts, Support, Log)
-# Use the existing scripts/create-tables.sh or create them manually
-
-# Run dev server
-npm run dev
+./scripts/start-local.sh
 ```
 
-Open http://localhost:3000
+This starts a local DynamoDB container, creates the `Team`/`Scouts`/`Support`/`Log`
+tables, and runs the dev server on http://localhost:3000. Copy `.env.example`
+to `.env.local` first and fill in `COGNITO_USER_POOL_ID`/`COGNITO_CLIENT_ID`
+for a dev pool (`node scripts/create-cognito-pool.js dev` provisions one).
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DM_DEV` | `true` uses local DynamoDB on port 8000 | `true` |
-| `NEXT_PUBLIC_DM_DEV` | Shows DEV banner in UI | `true` |
-| `NEXT_PUBLIC_DM_LOCK` | Locks entries (read-only) | `false` |
-| `DM_BANKDETS` | Bank details for payment info | - |
+| Variable | Description |
+|----------|-------------|
+| `DM_DEV` | `true` uses local DynamoDB on port 8000 |
+| `NEXT_PUBLIC_DM_DEV` | Shows a DEV banner in the UI |
+| `NEXT_PUBLIC_DM_LOCK` | Locks entries (read-only) |
+| `DM_BANKDETS` | Bank details shown for payment |
+| `COGNITO_USER_POOL_ID` | Cognito User Pool ID |
+| `COGNITO_CLIENT_ID` | Cognito App Client ID |
+| `COGNITO_REGION` | AWS region for Cognito calls |
 
 ## DynamoDB Tables
 
-Same tables as the original Java version:
-
-- **User** - hash: `ownerID` ("None"), range: `username`
-- **Team** - hash: `ownerID`, range: `id`
-- **Scouts** - hash: `ownerID`, range: `id`
-- **Support** - hash: `ownerID`, range: `id`
+- **Team** - hash: `ownerID` (the owning user's id), range: `id`
+- **Scouts** - hash: `ownerID` (the owning team's id), range: `id`
+- **Support** - hash: `ownerID` (the owning team's id), range: `id`
 - **Log** - hash: `ownerID` ("log"), range: `id`
 
-## Production Deployment
-
-```bash
-npm run build
-npm start
-```
-
-Set `DM_DEV=false` in production to connect to real AWS DynamoDB.
+User accounts live in Cognito, not DynamoDB - see [DEPLOYMENT.md](./DEPLOYMENT.md#cognito).
 
 ## Architecture
 
@@ -65,14 +54,11 @@ src/
 │   ├── api/          # API routes (auth, teams, scouts, support, admin)
 │   ├── layout.tsx    # Root layout
 │   └── page.tsx      # Main page (team list, login/register)
-├── components/       # React components (dialogs)
+├── components/       # React components (dialogs) and shared ui/ primitives
+├── lib/              # Session/cookie handling, request authorization
+├── middleware.ts     # Verifies the session on every /api/* request
 ├── models/           # TypeScript interfaces & reference data
-├── services/         # DynamoDB service layer
-└── utils/            # Helpers (validation, date, hash)
+├── services/         # DynamoDB and Cognito service layers
+└── utils/            # Helpers (validation, date)
+lambda/                # Cognito trigger Lambdas (user migration, group sync)
 ```
-
-## Migration Notes
-
-- Passwords use the same MD5 hash as the original Java app, so existing users can log in with the same credentials
-- The DynamoDB table structure is identical - this app reads/writes the same data
-- All team validation rules (age checks, team size, hike class requirements) are preserved

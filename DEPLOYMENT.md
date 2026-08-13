@@ -12,13 +12,12 @@
 
 ## How Deployment Works
 
-Amplify is connected to the GitHub repo `scottejames/DownsmanV6`. When code is pushed to `master`, Amplify automatically:
+Amplify is connected to the GitHub repo `scottejames/DownsmanV7`. When code is pushed to `master`, Amplify automatically:
 
 1. Clones the repo
-2. Uses `NewDownsman/` as the app root (monorepo setup via `AMPLIFY_MONOREPO_APP_ROOT`)
-3. Runs `npm ci` then `npm run build`
-4. Injects environment variables (`DM_*`, `NEXT_PUBLIC_*`, `COGNITO_*`) into `.env.production`
-5. Deploys the `.next` output
+2. Runs `npm ci` then `npm run build`
+3. Injects environment variables (`DM_*`, `NEXT_PUBLIC_*`, `COGNITO_*`) into `.env.production`
+4. Deploys the `.next` output
 
 ## Scripts
 
@@ -54,7 +53,6 @@ Live site: https://master.d1mwozzx371w2q.amplifyapp.com
 
 | Variable | Purpose |
 |----------|---------|
-| `AMPLIFY_MONOREPO_APP_ROOT` | `NewDownsman` - tells Amplify which subdirectory is the app |
 | `DM_DEV` | `false` in prod - controls dev mode banner |
 | `DM_LOCK` | `false` - set to `true` to lock entries |
 | `DM_BANKDETS` | Bank details shown for payment |
@@ -93,25 +91,23 @@ The build spec is stored in the Amplify console (not a local file):
 
 ```yaml
 version: 1
-applications:
-  - appRoot: NewDownsman
-    frontend:
-      phases:
-        preBuild:
-          commands:
-            - npm ci
-        build:
-          commands:
-            - env | grep -e DM_ >> .env.production
-            - env | grep -e NEXT_PUBLIC_ >> .env.production
-            - env | grep -e COGNITO_ >> .env.production
-            - npm run build
-      artifacts:
-        baseDirectory: .next
-        files:
-          - '**/*'
-      cache:
-        paths:
-          - node_modules/**/*
-          - .next/cache/**/*
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - env | grep -e DM_ >> .env.production
+        - env | grep -e NEXT_PUBLIC_ >> .env.production
+        - env | grep -e COGNITO_ >> .env.production
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*
 ```
