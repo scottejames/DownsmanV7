@@ -55,6 +55,7 @@ Live site: https://master.d1mwozzx371w2q.amplifyapp.com
 |----------|---------|
 | `DM_DEV` | `false` in prod - controls dev mode banner |
 | `DM_LOCK` | `false` - set to `true` to lock entries |
+| `NEXT_PUBLIC_DM_HIKE_DATE` | This season's hike date (`YYYY-MM-DD`) - required, the app fails to load without it |
 | `DM_BANKDETS` | Bank details shown for payment |
 | `COGNITO_USER_POOL_ID` | Cognito User Pool ID - prod: `eu-west-2_1B5NhDvlc` |
 | `COGNITO_CLIENT_ID` | Cognito App Client ID - prod: `14fr5t5bkbkmnqtrl14dkjbtvc` |

@@ -35,6 +35,16 @@ your input or because there's no urgency.
   Low priority - it's a cheap, harmless no-op for everyone else - but could be
   stripped out once you're confident no legacy accounts remain.
 
+## Pre-season checklist
+
+- **Set `NEXT_PUBLIC_DM_HIKE_DATE` to the real hike date before each season opens** -
+  both locally (`.env.local`) and in the Amplify Console for prod. The app throws on
+  load if it's unset, so this can't be silently forgotten the way the old hardcoded
+  `HIKE_DATE` constant was (see `CODE_REVIEW_2026-08-13.md`'s H4) - but it still has
+  to be *set correctly*, which nothing currently double-checks against the actual
+  event date. If this ever bites again, consider a startup check that warns when the
+  configured date is more than ~a year in the past.
+
 ## Dependabot
 
 - **`io.github.bonigarcia:webdrivermanager` (critical)** - lives in the

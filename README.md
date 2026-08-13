@@ -32,6 +32,7 @@ for a dev pool (`node scripts/create-cognito-pool.js dev` provisions one).
 | `DM_DEV` | `true` uses local DynamoDB on port 8000 |
 | `NEXT_PUBLIC_DM_DEV` | Shows a DEV banner in the UI |
 | `NEXT_PUBLIC_DM_LOCK` | Locks entries (read-only) |
+| `NEXT_PUBLIC_DM_HIKE_DATE` | This season's hike date (`YYYY-MM-DD`) - required, every age-based validation rule depends on it |
 | `DM_BANKDETS` | Bank details shown for payment |
 | `COGNITO_USER_POOL_ID` | Cognito User Pool ID |
 | `COGNITO_CLIENT_ID` | Cognito App Client ID |

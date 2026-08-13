@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TeamModel, ScoutModel, SupportModel, UserModel } from '@/models/types';
 import LoginDialog from '@/components/LoginDialog';
 import RegisterDialog from '@/components/RegisterDialog';
@@ -20,6 +20,8 @@ export default function Home() {
   const [showRegister, setShowRegister] = useState(false);
   const [showTeamDialog, setShowTeamDialog] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [addingTeam, setAddingTeam] = useState(false);
+  const addingTeamRef = useRef(false);
 
   const locked = process.env.NEXT_PUBLIC_DM_LOCK === 'true';
 
@@ -63,22 +65,33 @@ export default function Home() {
   };
 
   const addTeam = async () => {
-    if (!user) return;
-    const team: TeamModel = {
-      ownerID: user.id!,
-      teamName: 'New Team',
-      leaderName: user.username,
-      paymentAmount: 0,
-      paymentRecieved: false,
-      teamSubmitted: false,
-      campingAtStart: false,
-      committedToRun: false,
-    };
-    const res = await fetch('/api/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(team) });
-    const saved = await res.json();
-    setSelectedTeam(saved);
-    setShowTeamDialog(true);
-    loadTeams();
+    // Synchronous ref guard, not just the `addingTeam` state check below - two clicks
+    // landing before the first re-render would otherwise both pass a state-only check
+    // and each mint a separate Team row (saveTeam() assigns a fresh uuid whenever id
+    // is unset). See CODE_REVIEW_2026-08-13.md's H2.
+    if (!user || addingTeamRef.current) return;
+    addingTeamRef.current = true;
+    setAddingTeam(true);
+    try {
+      const team: TeamModel = {
+        ownerID: user.id!,
+        teamName: 'New Team',
+        leaderName: user.username,
+        paymentAmount: 0,
+        paymentRecieved: false,
+        teamSubmitted: false,
+        campingAtStart: false,
+        committedToRun: false,
+      };
+      const res = await fetch('/api/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(team) });
+      const saved = await res.json();
+      setSelectedTeam(saved);
+      setShowTeamDialog(true);
+      loadTeams();
+    } finally {
+      addingTeamRef.current = false;
+      setAddingTeam(false);
+    }
   };
 
   const deleteTeamHandler = async () => {
@@ -162,7 +175,11 @@ export default function Home() {
       <div className="flex gap-4">
         <button onClick={deleteTeamHandler} disabled={!selectedTeam || effectiveLocked} className="bg-red-600 px-4 py-2 rounded disabled:opacity-50 hover:bg-red-700">Delete Team</button>
         <button onClick={editTeam} disabled={!selectedTeam} className="bg-scout-purple px-4 py-2 rounded disabled:opacity-50 hover:bg-scout-purple-light">{effectiveLocked ? 'View Team' : 'Edit Team'}</button>
-        {!effectiveLocked && <button onClick={addTeam} className="bg-green-600 px-4 py-2 rounded hover:bg-green-700">Add Team</button>}
+        {!effectiveLocked && (
+          <button onClick={addTeam} disabled={addingTeam} className="bg-green-600 px-4 py-2 rounded disabled:opacity-50 hover:bg-green-700">
+            {addingTeam ? 'Adding…' : 'Add Team'}
+          </button>
+        )}
       </div>
 
       {showTeamDialog && selectedTeam && (

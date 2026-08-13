@@ -278,6 +278,13 @@ describe('validateTeam - A-Class', () => {
     const scouts = [scoutWithAge(18), scoutWithAge(17), scoutWithAge(17), scoutWithAge(16)];
     expect(validateTeam(team, scouts, [supportMember()])).toHaveLength(0);
   });
+
+  it('rejects team larger than 4 (CODE_REVIEW_2026-08-13.md H3)', () => {
+    const team = baseTeam('A-Class');
+    const scouts = Array(5).fill(null).map(() => scoutWithAge(20));
+    const errs = validateTeam(team, scouts, [supportMember()]);
+    expect(errs.some(e => e.includes('team size must be 3 or 4'))).toBe(true);
+  });
 });
 
 describe('validateTeam - V-Class', () => {
@@ -326,6 +333,13 @@ describe('validateTeam - V-Class', () => {
     const team = baseTeam('V-Class');
     const scouts = [scoutWithAge(40), scoutWithAge(35), scoutWithAge(35), scoutWithAge(35)];
     expect(validateTeam(team, scouts, [supportMember()])).toHaveLength(0);
+  });
+
+  it('rejects team larger than 4 (CODE_REVIEW_2026-08-13.md H3)', () => {
+    const team = baseTeam('V-Class');
+    const scouts = Array(5).fill(null).map(() => scoutWithAge(40));
+    const errs = validateTeam(team, scouts, [supportMember()]);
+    expect(errs.some(e => e.includes('team size must be 3 or 4'))).toBe(true);
   });
 });
 

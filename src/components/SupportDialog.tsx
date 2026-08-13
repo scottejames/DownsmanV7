@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { SupportModel } from '@/models/types';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
@@ -21,8 +21,14 @@ export default function SupportDialog({ support, onSave, onClose }: Props) {
   const [to, setTo] = useState(support?.to || '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Synchronous guard against a fast double-click, which a state-only check can miss -
+  // saveSupport() mints a fresh row whenever there's no existing id. See
+  // CODE_REVIEW_2026-08-13.md's H2.
+  const savingRef = useRef(false);
 
   const save = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setError('');
     setLoading(true);
     try {
@@ -37,6 +43,7 @@ export default function SupportDialog({ support, onSave, onClose }: Props) {
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not save support contact');
       setLoading(false);
+      savingRef.current = false;
     }
   };
 

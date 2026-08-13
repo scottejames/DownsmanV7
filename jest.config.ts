@@ -3,6 +3,7 @@ import type { Config } from 'jest';
 const config: Config = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
+  setupFiles: ['<rootDir>/jest.setup.ts'],
   // jest-environment-jsdom defaults to resolving the "browser" package.json
   // export condition, which breaks CJS-only deps that ship a browser/ESM
   // build under that condition (e.g. sinon, pulled in by aws-sdk-client-mock).

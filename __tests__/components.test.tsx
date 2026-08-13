@@ -1,8 +1,9 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import LoginDialog from '@/components/LoginDialog';
 import RegisterDialog from '@/components/RegisterDialog';
+import ScoutDialog from '@/components/ScoutDialog';
 
 global.fetch = jest.fn();
 
@@ -137,5 +138,29 @@ describe('RegisterDialog', () => {
     fireEvent.change(screen.getByPlaceholderText('Confirm Password'), { target: { value: 'pass1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Register' }));
     expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
+  });
+});
+
+describe('ScoutDialog', () => {
+  it('guards a double-click so onSave only fires once (CODE_REVIEW_2026-08-13.md H2)', async () => {
+    // Both clicks are dispatched inside one `act()` so React hasn't committed the
+    // loading-state re-render (and the button's `disabled` attribute) between them -
+    // this reproduces the actual race the ref guard exists for, not just "the button
+    // was already disabled by the time the second click happened."
+    let resolveSave: () => void = () => {};
+    const onSave = jest.fn(() => new Promise<void>(resolve => { resolveSave = resolve; }));
+    const onClose = jest.fn();
+
+    render(<ScoutDialog scout={null} onSave={onSave} onClose={onClose} />);
+    fireEvent.change(screen.getByPlaceholderText('Full Name'), { target: { value: 'Test Scout' } });
+    const saveButton = screen.getByRole('button', { name: 'Save' });
+
+    await act(async () => {
+      fireEvent.click(saveButton);
+      fireEvent.click(saveButton);
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    await act(async () => { resolveSave(); });
   });
 });

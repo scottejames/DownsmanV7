@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { ScoutModel } from '@/models/types';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
@@ -21,8 +21,14 @@ export default function ScoutDialog({ scout, onSave, onClose }: Props) {
   const [medicalNotes, setMedicalNotes] = useState(scout?.medicalNotes || '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Synchronous guard against a fast double-click, which a state-only check can miss -
+  // saveScout() mints a fresh row whenever there's no existing id. See
+  // CODE_REVIEW_2026-08-13.md's H2.
+  const savingRef = useRef(false);
 
   const save = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
     const dobEpoch = dob ? Math.floor(new Date(dob + 'T00:00:00Z').getTime() / 86400000) : 0;
     setError('');
     setLoading(true);
@@ -38,6 +44,7 @@ export default function ScoutDialog({ scout, onSave, onClose }: Props) {
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not save scout');
       setLoading(false);
+      savingRef.current = false;
     }
   };
 

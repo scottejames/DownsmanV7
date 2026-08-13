@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTeamsByOwner, saveTeam, deleteTeam, getAllTeams, getTeamById } from '@/services/db';
+import { getTeamsByOwner, saveTeam, deleteTeam, getAllTeams, getTeamById, getScoutsByOwner, getSupportByOwner } from '@/services/db';
 import { getSession } from '@/lib/authz';
+import { validateTeam } from '@/utils/validation';
 
 export async function GET(req: NextRequest) {
   const session = getSession(req);
@@ -23,6 +24,22 @@ export async function POST(req: NextRequest) {
   // land in the caller's own partition, matching the Team table's key schema
   // ({ownerID, id}) - see DEPLOYMENT.md / scripts/create-tables.js.
   team.ownerID = session.ownerId;
+
+  // TeamDialog.tsx already runs this client-side before submitting, but the
+  // client-side check is only a UX convenience - nothing stops a direct API call
+  // from setting teamSubmitted:true unvalidated, so it's re-checked here too. See
+  // CODE_REVIEW_2026-08-13.md's H1.
+  if (team.teamSubmitted) {
+    const [scouts, support] = await Promise.all([
+      getScoutsByOwner(team.id ?? ''),
+      getSupportByOwner(team.id ?? ''),
+    ]);
+    const errors = validateTeam(team, scouts, support);
+    if (errors.length > 0) {
+      return NextResponse.json({ error: errors.join(' ') }, { status: 400 });
+    }
+  }
+
   const saved = await saveTeam(team);
   return NextResponse.json(saved);
 }

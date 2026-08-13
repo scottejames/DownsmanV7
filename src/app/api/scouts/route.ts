@@ -11,6 +11,14 @@ async function ownsTeam(teamId: string, session: SessionIdentity): Promise<boole
   return !!team && team.ownerID === session.ownerId;
 }
 
+// ScoutDialog.tsx already keeps these fields filled in, but that's only a UX
+// guarantee - a direct API call could send anything. See CODE_REVIEW_2026-08-13.md's H1.
+function scoutShapeError(scout: Record<string, unknown>): string | null {
+  if (typeof scout.fullName !== 'string' || scout.fullName.trim() === '') return 'Full name is required';
+  if (typeof scout.dobEpoch !== 'number') return 'Date of birth is required';
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const session = getSession(req);
   const ownerID = req.nextUrl.searchParams.get('ownerID');
@@ -27,6 +35,9 @@ export async function POST(req: NextRequest) {
   if (!scout.ownerID || !(await ownsTeam(scout.ownerID, session))) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+  const shapeError = scoutShapeError(scout);
+  if (shapeError) return NextResponse.json({ error: shapeError }, { status: 400 });
+
   const saved = await saveScout(scout);
   return NextResponse.json(saved);
 }

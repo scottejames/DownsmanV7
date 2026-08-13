@@ -11,9 +11,12 @@ jest.mock('@/services/db', () => ({
   saveTeam: jest.fn(async (t) => t),
   deleteTeam: jest.fn(),
   getTeamById: jest.fn(),
-  getScoutsByOwner: jest.fn(),
+  getScoutsByOwner: jest.fn(async () => []),
   saveScout: jest.fn(async (s) => s),
   deleteScout: jest.fn(),
+  getSupportByOwner: jest.fn(async () => []),
+  saveSupport: jest.fn(async (s) => s),
+  deleteSupport: jest.fn(),
 }));
 
 jest.mock('@/services/cognito', () => ({
@@ -24,7 +27,31 @@ import * as db from '@/services/db';
 import * as cognito from '@/services/cognito';
 import { GET as teamsGet, POST as teamsPost, DELETE as teamsDelete } from '@/app/api/teams/route';
 import { POST as scoutsPost } from '@/app/api/scouts/route';
+import { POST as supportPost } from '@/app/api/support/route';
 import { GET as adminGet } from '@/app/api/admin/route';
+import { HIKE_DATE } from '@/models/referenceData';
+import { dateToEpochDay } from '@/utils/date';
+import { TeamModel, ScoutModel } from '@/models/types';
+
+function scoutWithAge(age: number): ScoutModel {
+  const dobEpoch = dateToEpochDay({ year: HIKE_DATE.year - age, month: HIKE_DATE.month, day: HIKE_DATE.day });
+  return { ownerID: 'team-1', fullName: `Scout ${age}`, dobEpoch, leader: false };
+}
+
+function validOpenClassTeam(overrides: Partial<TeamModel> = {}): Partial<TeamModel> {
+  return {
+    teamName: 'Test Team',
+    hikeClass: 'Open, Bigor - Washington',
+    activeMobile: '07777',
+    backupMobile: '07888',
+    emergencyContactName: 'EC Name',
+    emergencyContactMobile: '07999',
+    emergencyContactLandline: '01234',
+    emergencyContactEmail: 'ec@test.com',
+    teamSubmitted: true,
+    ...overrides,
+  };
+}
 
 function req(url: string, opts: { method?: string; groups?: string; ownerId?: string; body?: unknown } = {}) {
   const headers: Record<string, string> = {};
@@ -83,6 +110,46 @@ describe('teams route authorization', () => {
     expect(res.status).toBe(200);
     expect(db.deleteTeam).toHaveBeenCalledWith(expect.objectContaining({ id: 'team-1', ownerID: 'user-1' }));
   });
+
+  it('POST rejects teamSubmitted:true when the team fails validation (CODE_REVIEW_2026-08-13.md H1)', async () => {
+    // No scouts mocked (defaults to []), so validateTeam() fails with "Missing some scouts?"
+    // regardless of what a bypassing client claims - this is exactly the case a direct
+    // API call used to be able to sneak past, since only TeamDialog.tsx validated before.
+    const r = req('http://localhost/api/teams', {
+      method: 'POST',
+      ownerId: 'user-1',
+      groups: '',
+      body: validOpenClassTeam({ id: 'team-1' }),
+    });
+    const res = await teamsPost(r);
+    expect(res.status).toBe(400);
+    expect(db.saveTeam).not.toHaveBeenCalled();
+  });
+
+  it('POST allows teamSubmitted:true when the team passes validation', async () => {
+    (db.getScoutsByOwner as jest.Mock).mockResolvedValue([scoutWithAge(14), scoutWithAge(15), scoutWithAge(16)]);
+    const r = req('http://localhost/api/teams', {
+      method: 'POST',
+      ownerId: 'user-1',
+      groups: '',
+      body: validOpenClassTeam({ id: 'team-1' }),
+    });
+    const res = await teamsPost(r);
+    expect(res.status).toBe(200);
+    expect(db.saveTeam).toHaveBeenCalled();
+  });
+
+  it('POST does not run validation when teamSubmitted is not true (saving a draft)', async () => {
+    const r = req('http://localhost/api/teams', {
+      method: 'POST',
+      ownerId: 'user-1',
+      groups: '',
+      body: { id: 'team-1', teamName: 'Draft Team' },
+    });
+    const res = await teamsPost(r);
+    expect(res.status).toBe(200);
+    expect(db.saveTeam).toHaveBeenCalled();
+  });
 });
 
 describe('scouts route authorization', () => {
@@ -105,11 +172,78 @@ describe('scouts route authorization', () => {
       method: 'POST',
       ownerId: 'user-1',
       groups: '',
-      body: { ownerID: 'team-1', fullName: 'A Scout' },
+      body: { ownerID: 'team-1', fullName: 'A Scout', dobEpoch: 12345 },
     });
     const res = await scoutsPost(r);
     expect(res.status).toBe(200);
     expect(db.saveScout).toHaveBeenCalled();
+  });
+
+  it('POST rejects a scout with no fullName (CODE_REVIEW_2026-08-13.md H1)', async () => {
+    (db.getTeamById as jest.Mock).mockResolvedValue({ id: 'team-1', ownerID: 'user-1' });
+    const r = req('http://localhost/api/scouts', {
+      method: 'POST',
+      ownerId: 'user-1',
+      groups: '',
+      body: { ownerID: 'team-1', fullName: '', dobEpoch: 12345 },
+    });
+    const res = await scoutsPost(r);
+    expect(res.status).toBe(400);
+    expect(db.saveScout).not.toHaveBeenCalled();
+  });
+
+  it('POST rejects a scout with a non-numeric dobEpoch', async () => {
+    (db.getTeamById as jest.Mock).mockResolvedValue({ id: 'team-1', ownerID: 'user-1' });
+    const r = req('http://localhost/api/scouts', {
+      method: 'POST',
+      ownerId: 'user-1',
+      groups: '',
+      body: { ownerID: 'team-1', fullName: 'A Scout', dobEpoch: 'not-a-number' },
+    });
+    const res = await scoutsPost(r);
+    expect(res.status).toBe(400);
+    expect(db.saveScout).not.toHaveBeenCalled();
+  });
+});
+
+describe('support route authorization', () => {
+  it('POST is forbidden when the referenced team is not owned by the caller', async () => {
+    (db.getTeamById as jest.Mock).mockResolvedValue({ id: 'team-1', ownerID: 'someone-else' });
+    const r = req('http://localhost/api/support', {
+      method: 'POST',
+      ownerId: 'user-1',
+      groups: '',
+      body: { ownerID: 'team-1', fullName: 'A Support', phoneNumber: '07777' },
+    });
+    const res = await supportPost(r);
+    expect(res.status).toBe(403);
+    expect(db.saveSupport).not.toHaveBeenCalled();
+  });
+
+  it('POST succeeds when the caller owns the referenced team', async () => {
+    (db.getTeamById as jest.Mock).mockResolvedValue({ id: 'team-1', ownerID: 'user-1' });
+    const r = req('http://localhost/api/support', {
+      method: 'POST',
+      ownerId: 'user-1',
+      groups: '',
+      body: { ownerID: 'team-1', fullName: 'A Support', phoneNumber: '07777' },
+    });
+    const res = await supportPost(r);
+    expect(res.status).toBe(200);
+    expect(db.saveSupport).toHaveBeenCalled();
+  });
+
+  it('POST rejects a support contact with no phoneNumber (CODE_REVIEW_2026-08-13.md H1)', async () => {
+    (db.getTeamById as jest.Mock).mockResolvedValue({ id: 'team-1', ownerID: 'user-1' });
+    const r = req('http://localhost/api/support', {
+      method: 'POST',
+      ownerId: 'user-1',
+      groups: '',
+      body: { ownerID: 'team-1', fullName: 'A Support', phoneNumber: '' },
+    });
+    const res = await supportPost(r);
+    expect(res.status).toBe(400);
+    expect(db.saveSupport).not.toHaveBeenCalled();
   });
 });
 

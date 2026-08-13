@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TeamModel, ScoutModel, SupportModel } from '@/models/types';
 import { HIKE_CLASSES } from '@/models/referenceData';
 import { validateTeam, getPaymentStatus } from '@/utils/validation';
@@ -33,6 +33,9 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
   const [editingScout, setEditingScout] = useState<ScoutModel | null>(null);
   const [showSupportDialog, setShowSupportDialog] = useState(false);
   const [editingSupport, setEditingSupport] = useState<SupportModel | null>(null);
+  // Synchronous guard against a fast double-click on Submit, which a state-only
+  // check can miss. See CODE_REVIEW_2026-08-13.md's H2.
+  const submittingRef = useRef(false);
 
   const disabled = model.teamSubmitted || locked;
 
@@ -72,7 +75,8 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
   };
 
   const submitTeam = async () => {
-    if (!validate()) return;
+    if (submittingRef.current || !validate()) return;
+    submittingRef.current = true;
     setApiError('');
     setSubmitting(true);
     try {
@@ -83,6 +87,7 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
       setApiError(e instanceof ApiError ? e.message : 'Could not submit team');
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   };
 

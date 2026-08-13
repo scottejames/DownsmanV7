@@ -4,3 +4,4 @@ node_modules/
 out/
 backups/
 tsconfig.tsbuildinfo
+.claude/settings.local.json

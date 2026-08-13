@@ -60,12 +60,12 @@ export function validateTeam(model: TeamModel, scouts: ScoutModel[], support: Su
     if (!serviceCrew) results.push('Service crew required for B-Class');
     if (maxAge > 18) results.push(`For B-Class may not have hikers over 18 your max age is ${maxAge}`);
   } else if (hikeClass === 'A-Class') {
-    if (teamSize < 3) results.push(`For A-Class team size must be 3 or 4 your team is ${teamSize}`);
+    if (teamSize < 3 || teamSize > 4) results.push(`For A-Class team size must be 3 or 4 your team is ${teamSize}`);
     if (leader) results.push('For A-Class leaders may not hike');
     if (intCombinedAge < 48) results.push(`For A-Class combined age must be more than 48 your combined age is ${intCombinedAge}`);
     if (!serviceCrew) results.push('Service crew required for A-Class');
   } else if (hikeClass === 'V-Class') {
-    if (teamSize < 3) results.push(`For V-Class team size must be 3 or 4 your team size is ${teamSize}`);
+    if (teamSize < 3 || teamSize > 4) results.push(`For V-Class team size must be 3 or 4 your team size is ${teamSize}`);
     if (leader) results.push('For V-Class leaders may not hike');
     if (teamSize === 3 && intCombinedAge < 100) results.push(`For V-Class team of three combined age must be more than 100 your combined age is ${intCombinedAge}`);
     if (teamSize === 4 && intCombinedAge < 133) results.push(`For V-Class team of four combined age must be more than 133 your combined age is ${intCombinedAge}`);
