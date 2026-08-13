@@ -3,6 +3,16 @@
 All notable changes to this project are documented here, newest first.
 This project doesn't cut versioned releases, so entries are grouped by date rather than version number.
 
+## 2026-08-13 (5)
+
+### Added
+- `scripts/toggle-admin.js` (also `npm run toggle-admin -- <dev|prod> <username>`) - grants/revokes the Cognito `admin` group for a user, toggling on repeated runs. Looks up the target pool by name (`Downsman-dev`/`Downsman-prod`, same pattern as `create-cognito-pool.js`), describes the exact change (current state, new state, which environment), and requires typed `"yes"` confirmation before making it - matching the confirmation bar `resetDataYearEnd.sh` already holds itself to. Replaces the manual `aws cognito-idp admin-add-user-to-group` CLI step in `STARTUP.md`.
+
+## 2026-08-13 (4)
+
+### Added
+- **System Config screen** (`src/components/SystemConfig.tsx`), admin-only, launched from a new "System Config" button in `AdminPanel`. Shows the live value of every environment variable that configures this app (`NEXT_PUBLIC_DM_DEV`, `NEXT_PUBLIC_DM_LOCK`, `NEXT_PUBLIC_DM_HIKE_DATE`, `DM_DEV`, `DM_BANKDETS`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `COGNITO_REGION`), backed by a new `GET /api/admin/config` route (admin-gated, same pattern as the rest of `/api/admin`). Includes `DM_BANKDETS` deliberately even though it's dead code (see M4 in `CODE_REVIEW_2026-08-13.md`) rather than hiding it, since the point of this screen is to show what's actually configured, not a curated subset.
+
 ## 2026-08-13 (3)
 
 ### Fixed

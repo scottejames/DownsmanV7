@@ -29,6 +29,7 @@ import { GET as teamsGet, POST as teamsPost, DELETE as teamsDelete } from '@/app
 import { POST as scoutsPost } from '@/app/api/scouts/route';
 import { POST as supportPost } from '@/app/api/support/route';
 import { GET as adminGet } from '@/app/api/admin/route';
+import { GET as adminConfigGet } from '@/app/api/admin/config/route';
 import { HIKE_DATE } from '@/models/referenceData';
 import { dateToEpochDay } from '@/utils/date';
 import { TeamModel, ScoutModel } from '@/models/types';
@@ -260,5 +261,25 @@ describe('admin route authorization', () => {
     const r = req('http://localhost/api/admin', { ownerId: 'user-1', groups: 'admin' });
     const res = await adminGet(r);
     expect(res.status).toBe(200);
+  });
+});
+
+describe('admin config route authorization', () => {
+  it('GET is forbidden without the admin group', async () => {
+    const r = req('http://localhost/api/admin/config', { ownerId: 'user-1', groups: '' });
+    const res = await adminConfigGet(r);
+    expect(res.status).toBe(403);
+  });
+
+  it('GET succeeds with the admin group and returns every configured variable', async () => {
+    const r = req('http://localhost/api/admin/config', { ownerId: 'user-1', groups: 'admin' });
+    const res = await adminConfigGet(r);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'NEXT_PUBLIC_DM_HIKE_DATE' }),
+      expect.objectContaining({ key: 'COGNITO_USER_POOL_ID' }),
+      expect.objectContaining({ key: 'DM_BANKDETS' }),
+    ]));
   });
 });

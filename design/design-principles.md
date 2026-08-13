@@ -116,3 +116,22 @@ not separate build targets or config files.
 **How to apply:** for an app this size, a boolean env var checked at the point of use is
 enough — don't introduce a config-file layer or build-time branching until a flag
 actually needs more than true/false.
+
+## Give admins a way to see live config, not just documented config
+
+`CODE_REVIEW_2026-08-13.md`'s H4 and `63912a0` are two separate real incidents caused
+by the same underlying problem: a config value (`HIKE_DATE`, then later the
+`COGNITO_*` env vars in the Amplify build spec) silently drifted from what the docs
+claimed, and nothing surfaced the mismatch until it broke something in production. The
+System Config screen (admin-only, `src/components/SystemConfig.tsx` +
+`GET /api/admin/config`) exists to close that gap for the app's own env vars: it
+reads `process.env` directly and shows exactly what a given deployment actually has
+set, right now — not what `.env.example`/`README.md`/`DEPLOYMENT.md` say *should* be
+set. It deliberately includes `DM_BANKDETS` even though it's dead code (see M4),
+because hiding a variable from this screen would defeat the point of it being a source
+of truth.
+
+**How to apply:** when documentation and runtime config can drift apart silently (an
+env var, a feature flag, anything set outside the codebase itself), prefer building a
+way to inspect the *live* value over trusting the docs to stay accurate — this repo has
+already been bitten twice by the alternative.

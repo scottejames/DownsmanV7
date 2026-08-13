@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { TeamModel, UserModel } from '@/models/types';
 import Modal from './ui/Modal';
+import Button from './ui/Button';
 import Banner from './ui/Banner';
 import { apiRequest, postJson, ApiError } from './ui/api';
+import SystemConfig from './SystemConfig';
 
 interface Props { onClose: () => void; }
 
@@ -18,6 +20,7 @@ export default function AdminPanel({ onClose }: Props) {
   const [error, setError] = useState('');
   const [tempPassword, setTempPassword] = useState<{ username: string; password: string } | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
 
   const load = useCallback(async () => {
     setError('');
@@ -55,9 +58,12 @@ export default function AdminPanel({ onClose }: Props) {
 
   return (
     <Modal title="Admin Panel" onClose={onClose} maxWidthClass="max-w-4xl">
-      <div className="mb-4 flex gap-2">
-        <button onClick={() => setTab('users')} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'users' ? 'bg-scout-purple text-white' : 'bg-scout-field text-gray-300 hover:bg-scout-field-border'}`}>Users</button>
-        <button onClick={() => setTab('teams')} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'teams' ? 'bg-scout-purple text-white' : 'bg-scout-field text-gray-300 hover:bg-scout-field-border'}`}>Teams</button>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex gap-2">
+          <button onClick={() => setTab('users')} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'users' ? 'bg-scout-purple text-white' : 'bg-scout-field text-gray-300 hover:bg-scout-field-border'}`}>Users</button>
+          <button onClick={() => setTab('teams')} className={`rounded-lg px-4 py-2 text-sm font-medium transition ${tab === 'teams' ? 'bg-scout-purple text-white' : 'bg-scout-field text-gray-300 hover:bg-scout-field-border'}`}>Teams</button>
+        </div>
+        <Button variant="secondary" onClick={() => setShowConfig(true)}>System Config</Button>
       </div>
 
       {error && <Banner tone="error">{error}</Banner>}
@@ -143,6 +149,8 @@ export default function AdminPanel({ onClose }: Props) {
           )}
         </div>
       )}
+
+      {showConfig && <SystemConfig onClose={() => setShowConfig(false)} />}
     </Modal>
   );
 }

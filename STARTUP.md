@@ -68,12 +68,14 @@ local/offline auth emulation.
 Admin status is a Cognito group, not a database field:
 
 ```bash
-aws cognito-idp admin-add-user-to-group \
-  --user-pool-id <your dev pool id> \
-  --username <username> \
-  --group-name admin \
-  --region eu-west-2
+node scripts/toggle-admin.js dev <username>
 ```
+
+It looks up the `Downsman-dev` pool by name, shows you the current/new state,
+and asks for typed confirmation before making any change - see the script's
+header comment. It also works against prod
+(`node scripts/toggle-admin.js prod <username>`); running it again toggles the
+user back off admin.
 
 They'll need to log out and back in (or wait for the next token refresh) to
 pick up the new group membership.

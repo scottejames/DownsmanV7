@@ -55,3 +55,9 @@ export interface LogModel {
   when: string;
   what: string;
 }
+
+export interface ConfigVar {
+  key: string;
+  description: string;
+  value: string | null;
+}

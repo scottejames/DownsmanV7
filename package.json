@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "create-tables": "node scripts/create-tables.js",
+    "toggle-admin": "node scripts/toggle-admin.js",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

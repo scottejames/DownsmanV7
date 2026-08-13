@@ -45,6 +45,18 @@ your input or because there's no urgency.
   event date. If this ever bites again, consider a startup check that warns when the
   configured date is more than ~a year in the past.
 
+## Code review follow-ups
+
+- **Wire up (or remove) the dead audit-logging feature.** `logEvent()`
+  (`src/services/db.ts`) and the `Log` DynamoDB table (created in
+  `scripts/create-tables.js`, included in `scripts/backup-dynamo.sh`) are
+  fully provisioned but never called from anywhere in the app - `grep -rn
+  "logEvent" src/` only finds its own definition. Either wire it into the
+  mutating routes it was clearly built for (team/scout/support
+  create/delete, admin actions), or remove the table and function per
+  `CODING_GUIDELINES.md` Section 1 - unused infrastructure isn't free.
+  See `CODE_REVIEW_2026-08-13.md`'s M3.
+
 ## Dependabot
 
 - **`io.github.bonigarcia:webdrivermanager` (critical)** - lives in the
