@@ -4,17 +4,6 @@ const client = new DynamoDBClient({ endpoint: 'http://localhost:8000', region: '
 
 const tables = [
   {
-    TableName: 'User',
-    KeySchema: [
-      { AttributeName: 'ownerID', KeyType: 'HASH' },
-      { AttributeName: 'username', KeyType: 'RANGE' },
-    ],
-    AttributeDefinitions: [
-      { AttributeName: 'ownerID', AttributeType: 'S' },
-      { AttributeName: 'username', AttributeType: 'S' },
-    ],
-  },
-  {
     TableName: 'Team',
     KeySchema: [
       { AttributeName: 'ownerID', KeyType: 'HASH' },

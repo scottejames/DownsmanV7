@@ -1,8 +1,7 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, GetCommand, DeleteCommand, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, DeleteCommand, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuid } from 'uuid';
-import { UserModel, TeamModel, ScoutModel, SupportModel, LogModel } from '../models/types';
-import { hashPassword } from '../utils/hash';
+import { TeamModel, ScoutModel, SupportModel, LogModel } from '../models/types';
 
 const isDev = process.env.DM_DEV !== 'false';
 
@@ -13,53 +12,6 @@ const client = new DynamoDBClient(
 );
 
 const db = DynamoDBDocumentClient.from(client);
-
-// ─── Users ───────────────────────────────────────────────────────────────────
-
-export async function getAllUsers(): Promise<UserModel[]> {
-  const res = await db.send(new QueryCommand({
-    TableName: 'User',
-    KeyConditionExpression: 'ownerID = :o',
-    ExpressionAttributeValues: { ':o': 'None' },
-  }));
-  return (res.Items || []) as UserModel[];
-}
-
-export async function findUserByUsername(username: string): Promise<UserModel | null> {
-  const users = await getAllUsers();
-  return users.find(u => u.username === username) || null;
-}
-
-export async function login(username: string, password: string): Promise<UserModel | null> {
-  if (!username || !password) return null;
-  const user = await findUserByUsername(username);
-  if (!user) return null;
-  if (user.password === hashPassword(password)) return user;
-  return null;
-}
-
-export async function addUser(user: UserModel): Promise<UserModel> {
-  if (!user.id) user.id = uuid();
-  await db.send(new PutCommand({
-    TableName: 'User',
-    Item: { ownerID: 'None', ...user },
-  }));
-  return user;
-}
-
-export async function updateUser(user: UserModel): Promise<void> {
-  await db.send(new PutCommand({
-    TableName: 'User',
-    Item: { ownerID: 'None', ...user },
-  }));
-}
-
-export async function deleteUser(username: string): Promise<void> {
-  await db.send(new DeleteCommand({
-    TableName: 'User',
-    Key: { ownerID: 'None', username },
-  }));
-}
 
 // ─── Teams ───────────────────────────────────────────────────────────────────
 

@@ -27,8 +27,10 @@ Amplify is connected to the GitHub repo `scottejames/DownsmanV6`. When code is p
 | `scripts/start-local.sh` | Start app locally with local DynamoDB |
 | `scripts/build.sh` | Production build (local verification) |
 | `scripts/deploy.sh` | Push to GitHub and wait for Amplify deployment |
-| `scripts/create-tables.js` | Create DynamoDB tables |
-| `scripts/make-admin.sh` | Promote a user to admin |
+| `scripts/create-tables.js` | Create DynamoDB tables (Team/Scouts/Support/Log) |
+| `scripts/create-cognito-pool.js` | Provision a Cognito user pool (`dev` or `prod`) |
+| `scripts/deploy-lambdas.sh` | Deploy/wire the Cognito trigger Lambdas |
+| `scripts/backup-dynamo.sh` | Back up all DynamoDB tables |
 
 ## Deploy
 
