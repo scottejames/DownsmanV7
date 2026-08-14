@@ -3,6 +3,11 @@
 All notable changes to this project are documented here, newest first.
 This project doesn't cut versioned releases, so entries are grouped by date rather than version number.
 
+## 2026-08-14
+
+### Added
+- **Positive feedback on "Validate"** in `TeamDialog`: clicking Validate on a team with no errors previously gave no visual feedback at all (only a failing validation showed a banner). It now shows a success banner ("This team meets all the requirements... and is ready to submit.") with an inline Submit Team button, so a valid team is unambiguous and submitting is one click away. The success state is tied to a new `validated` flag, not just `errors.length === 0` (which was also true before Validate had ever been clicked), and is cleared by any edit to the team or its scouts/support - so it can't show a stale "valid" banner after a change.
+
 ## 2026-08-13 (6)
 
 ### Fixed

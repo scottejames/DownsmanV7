@@ -24,6 +24,10 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
   const [support, setSupport] = useState<SupportModel[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
+  // Whether the *current* model has been validated - distinct from errors.length===0,
+  // which is also true before Validate has ever been clicked. Reset on any change that
+  // could affect validity, so a stale "Valid" banner never survives an edit.
+  const [validated, setValidated] = useState(false);
   const [apiError, setApiError] = useState('');
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -53,6 +57,7 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
 
   const update = (field: keyof TeamModel, value: string | boolean) => {
     setModel(m => ({ ...m, [field]: value }));
+    setValidated(false);
   };
 
   const save = async (close = true) => {
@@ -71,6 +76,7 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
   const validate = () => {
     const errs = validateTeam(model, scouts, support);
     setErrors(errs);
+    setValidated(true);
     return errs.length === 0;
   };
 
@@ -112,6 +118,7 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
       const idx = prev.findIndex(s => s.id === saved.id);
       return idx >= 0 ? prev.map(s => s.id === saved.id ? saved : s) : [...prev, saved];
     });
+    setValidated(false);
     setShowScoutDialog(false);
     setEditingScout(null);
   };
@@ -122,6 +129,7 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
     try {
       await deleteJson('/api/scouts', { ownerID: scout.ownerID, id: scout.id });
       setScouts(prev => prev.filter(s => s.id !== scout.id));
+      setValidated(false);
     } catch (e) {
       setApiError(e instanceof ApiError ? e.message : 'Could not delete scout');
     } finally {
@@ -136,6 +144,7 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
       const idx = prev.findIndex(x => x.id === saved.id);
       return idx >= 0 ? prev.map(x => x.id === saved.id ? saved : x) : [...prev, saved];
     });
+    setValidated(false);
     setShowSupportDialog(false);
     setEditingSupport(null);
   };
@@ -146,6 +155,7 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
     try {
       await deleteJson('/api/support', { ownerID: s.ownerID, id: s.id });
       setSupport(prev => prev.filter(x => x.id !== s.id));
+      setValidated(false);
     } catch (e) {
       setApiError(e instanceof ApiError ? e.message : 'Could not delete support contact');
     } finally {
@@ -164,6 +174,14 @@ export default function TeamDialog({ team, locked, onClose }: Props) {
       {errors.length > 0 && (
         <Banner tone="error">
           {errors.map((e, i) => <p key={i}>{e}</p>)}
+        </Banner>
+      )}
+      {validated && errors.length === 0 && !model.teamSubmitted && (
+        <Banner tone="success">
+          <p>This team meets all the requirements for {model.hikeClass} and is ready to submit.</p>
+          <div className="mt-2">
+            <Button variant="success" onClick={submitTeam} loading={submitting}>Submit Team</Button>
+          </div>
         </Banner>
       )}
 
